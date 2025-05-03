@@ -29,9 +29,4 @@ class EnvVariable extends Model
     {
         return $this->hasMany(EnvValue::class, 'env_variable_id', 'id');
     }
-
-    public function envVariableChanges()
-    {
-        return $this->hasMany(EnvVariableChange::class, 'env_variable_id', 'id');
-    }
 }

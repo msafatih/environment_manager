@@ -13,7 +13,6 @@ import {
     Database,
     Variable,
     AlertTriangle,
-    Hash,
     SortAsc,
 } from "lucide-react";
 import { Button } from "@/Components/ui/button";
@@ -26,8 +25,7 @@ import {
     CardTitle,
 } from "@/Components/ui/card";
 import { Input } from "@/Components/ui/input";
-import { Textarea } from "@/Components/ui/textarea";
-import { Label } from "@/Components/ui/label";
+import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/Components/ui/alert";
 import { Breadcrumb } from "@/Components/Breadcrumb";
 import {

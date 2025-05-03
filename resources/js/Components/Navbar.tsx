@@ -288,22 +288,8 @@ const Navbar = () => {
                             : "text-white hover:bg-white/10"
                     }`}
                                 >
-                                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center mr-2 overflow-hidden">
-                                        {props.auth.user.avatar ? (
-                                            <img
-                                                src={
-                                                    props.auth.user.avatar ||
-                                                    "/placeholder.svg"
-                                                }
-                                                alt={props.auth.user.name}
-                                                className="w-full h-full object-cover"
-                                            />
-                                        ) : (
-                                            <User className="h-4 w-4 text-indigo-600" />
-                                        )}
-                                    </div>
                                     <span className="mr-1">
-                                        {props.auth.user.name}
+                                        {props.auth.user.full_name}
                                     </span>
                                     <ChevronDown className="h-4 w-4" />
                                 </button>
@@ -431,23 +417,9 @@ const Navbar = () => {
                     {isAuthenticated && (
                         <div className="p-6 border-b border-gray-100">
                             <div className="flex items-center space-x-3">
-                                <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden">
-                                    {props.auth.user.avatar ? (
-                                        <img
-                                            src={
-                                                props.auth.user.avatar ||
-                                                "/placeholder.svg"
-                                            }
-                                            alt={props.auth.user.name}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    ) : (
-                                        <User className="h-6 w-6 text-indigo-600" />
-                                    )}
-                                </div>
                                 <div>
                                     <div className="font-medium text-gray-900">
-                                        {props.auth.user.name}
+                                        {props.auth.user.full_name}
                                     </div>
                                     <div className="text-sm text-gray-500 truncate">
                                         {props.auth.user.email}

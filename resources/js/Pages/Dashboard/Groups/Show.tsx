@@ -17,7 +17,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/Components/ui/select";
-import { Label } from "@/Components/ui/label";
+import { Label } from "@/components/ui/label";
 import {
     ArrowLeft,
     Edit,

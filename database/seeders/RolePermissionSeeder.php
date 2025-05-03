@@ -82,6 +82,8 @@ class RolePermissionSeeder extends Seeder
         Permission::create(['name' => 'edit-permissions']);
         Permission::create(['name' => 'delete-permissions']);
 
+        Permission::create(['name' => 'view-env-variable-changes']);
+
         $super_admin->givePermissionTo(Permission::all());
     }
 }

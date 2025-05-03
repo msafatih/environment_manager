@@ -4,15 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class EnvVariableChange extends Model
+class EnvValueChange extends Model
 {
     //
 
-    protected $table = 'env_variable_changes';
+    protected $table = 'env_value_changes';
 
     protected $fillable = [
         'user_id',
-        'env_variable_id',
+        'env_value_id',
         'old_value',
         'new_value',
         'type',

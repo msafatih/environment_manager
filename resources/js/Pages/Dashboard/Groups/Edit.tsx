@@ -28,7 +28,7 @@ import {
     CardTitle,
 } from "@/Components/ui/card";
 import { Input } from "@/Components/ui/input";
-import { Label } from "@/Components/ui/label";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/Components/ui/textarea";
 import { Alert, AlertDescription } from "@/Components/ui/alert";
 import { Breadcrumb } from "@/Components/Breadcrumb";

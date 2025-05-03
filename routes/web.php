@@ -6,6 +6,7 @@ use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\EnvValueChangeController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -59,6 +60,8 @@ Route::prefix('/dashboard')->group(function () {
     });
 
     Route::resource('applications', ApplicationController::class);
+
+    Route::resource('envValueChanges', EnvValueChangeController::class)->except(['create', 'edit']);
 
     Route::resource('users', UserController::class);
     Route::put('/roles/{role}/roles', [RoleController::class, 'updateRoles'])->name('roles.users.update');

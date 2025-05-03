@@ -6,7 +6,7 @@ export interface User {
     created_at: string;
     updated_at: string;
     group: GroupMember[];
-    env_variable_changes: EnvVariableChange[];
+    env_value_changes: EnvValueChange[];
     roles?: ModelHasRole[];
     permissions?: ModelHasPermission[];
     all_permissions?: Permission[];
@@ -79,7 +79,7 @@ export interface EnvVariable {
     updated_at: string;
     application: Application;
     env_values: EnvValue[];
-    env_variable_changes: EnvVariableChange[];
+    env_variable_changes: EnvValueChange[];
 }
 
 export interface Application {
@@ -110,6 +110,7 @@ export interface EnvValue {
     updated_at: string;
     env_variable: EnvVariable;
     access_key: AccesKey;
+    env_value_changes: EnvValueChange[];
 }
 
 export interface EnvType {
@@ -120,14 +121,14 @@ export interface EnvType {
     access_keys: AccesKey[];
 }
 
-export interface EnvVariableChange {
+export interface EnvValueChange {
     id: string;
     old_value: string;
     new_value: string;
     type: string;
     created_at: string;
     updated_at: string;
-    env_variable: EnvVariable;
+    env_value: EnvValue;
     user: User;
 }
 

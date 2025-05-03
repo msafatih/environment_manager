@@ -24,7 +24,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@/Components/ui/card";
-import { Label } from "@/Components/ui/label";
+import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/Components/ui/alert";
 import { Breadcrumb } from "@/Components/Breadcrumb";
 import {
