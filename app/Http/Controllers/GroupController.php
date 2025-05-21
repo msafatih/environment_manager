@@ -12,6 +12,9 @@ use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Spatie\Permission\Models\Permission;
+use Illuminate\Support\Facades\DB;
 
 class GroupController extends Controller
 {
@@ -19,14 +22,14 @@ class GroupController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+    public function index()
     {
         $this->authorize(ability: 'view-groups');
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        $groups = Group::with(['groupMembers', 'applications'])
+        $groups = Group::with(['groupMembers'])
             ->orderBy('name')
             ->get();
 
@@ -56,7 +59,52 @@ class GroupController extends Controller
         //
         $validatedData = $request->validated();
         try {
-            $group = Group::create($validatedData);
+            $group = Group::create([
+                'name' => $validatedData['name'],
+                'description' => $validatedData['description'],
+                'slug' => Str::slug($validatedData['name']),
+            ])->load([
+                'groupMembers',
+                'applications'
+            ]);
+
+            /** @var \App\Models\User $user */
+            $user = Auth::user();
+
+            // Create group-specific permissions
+            $viewPermission = Permission::create(['name' => 'view-group-' . $group->slug]);
+            $editPermission = Permission::create(['name' => 'edit-group-' . $group->slug]);
+            $deletePermission = Permission::create(['name' => 'delete-group-' . $group->slug]);
+
+            $createMembersPermission = Permission::create(['name' => 'create-groupMembers-' . $group->slug]);
+            $editMembersPermission = Permission::create(['name' => 'edit-groupMembers-' . $group->slug]);
+            $deleteMembersPermission = Permission::create(['name' => 'delete-groupMembers-' . $group->slug]);
+
+            $viewAppsPermission = Permission::create(['name' => 'view-applications-' . $group->slug]);
+            $createAppsPermission = Permission::create(['name' => 'create-applications-' . $group->slug]);
+            $editAppsPermission = Permission::create(['name' => 'edit-applications-' . $group->slug]);
+            $deleteAppsPermission = Permission::create(['name' => 'delete-applications-' . $group->slug]);
+
+            // Assign all permissions to the user
+            $user->givePermissionTo([
+                $viewPermission,
+                $editPermission,
+                $deletePermission,
+                $createMembersPermission,
+                $editMembersPermission,
+                $deleteMembersPermission,
+                $viewAppsPermission,
+                $createAppsPermission,
+                $editAppsPermission,
+                $deleteAppsPermission
+            ]);
+
+            GroupMember::create([
+                'user_id' => $user->id,
+                'group_id' => $group->id,
+                'role' => 'admin',
+            ]);
+
             return redirect()->route('groups.index')->with('success', 'Group created successfully!');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to create group: ' . $e->getMessage());
@@ -68,41 +116,40 @@ class GroupController extends Controller
      */
     public function show(Group $group)
     {
-        //
-        $this->authorize(ability: 'view-groups');
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        // Use a custom gate check instead
+        if (!$user->can('view-groups') && !$user->can('view-group-' . $group->slug)) {
+            $this->authorize('view-groups'); // This will throw the appropriate 403 exception
+        }
 
         $group->load(
             'groupMembers',
             'groupMembers.user',
             'applications'
         );
-        /** @var \App\Models\User $user */
-        $user = Auth::user();
 
-
+        // Also add group-specific permissions
         return Inertia::render('Dashboard/Groups/Show', [
             'group' => $group,
-            'canAddApplications' => $user->can('create-applications'),
-            'canViewApplications' => $user->can('view-applications'),
-            'canCreateApplications' => $user->can('create-applications'),
-            'canEditApplications' => $user->can('edit-applications'),
-            'canDeleteApplications' => $user->can('delete-applications'),
-            'canAddGroupMembers' => $user->can('create-groupMembers'),
-            'canViewGroupMembers' => $user->can('view-groupMembers'),
-            'canCreateGroupMembers' => $user->can('create-groupMembers'),
-            'canEditGroupMembers' => $user->can('edit-groupMembers'),
-            'canDeleteGroupMembers' => $user->can('delete-groupMembers'),
+            'canViewApplications' => $user->can('view-applications') || $user->can('view-applications-' . $group->slug),
+            'canViewGroupMembers' => $user->can('view-groupMembers') || $user->can('view-groupMembers-' . $group->slug),
+            'canCreateGroupMembers' => $user->can('create-groupMembers') || $user->can('create-groupMembers-' . $group->slug),
+            'canEditGroupMembers' => $user->can('edit-groupMembers') || $user->can('edit-groupMembers-' . $group->slug),
+            'canDeleteGroupMembers' => $user->can('delete-groupMembers') || $user->can('delete-groupMembers-' . $group->slug),
         ]);
     }
-
     /**
      * Show the form for editing the specified resource.
      */
     public function edit(Group $group)
     {
         //
-        $this->authorize(ability: 'edit-groups');
-
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if (!$user->can('edit-groups') && !$user->can('edit-group-' . $group->slug)) {
+            $this->authorize('view-groups'); // This will throw the appropriate 403 exception
+        }
         return Inertia::render('Dashboard/Groups/Edit', [
             'group' => $group,
         ]);
@@ -124,62 +171,229 @@ class GroupController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Remove the specified group and clean up associated permissions.
+     *
+     * @param Group $group
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function destroy(Group $group)
     {
-        //
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // Check if user has either global or group-specific delete permission
+        if (!$user->can('delete-groups') && !$user->can('delete-group-' . $group->slug)) {
+            $this->authorize('delete-group-' . $group->slug); // Throw the specific permission exception
+        }
+
+        try {
+            // Start a database transaction to ensure all operations succeed or fail together
+            DB::beginTransaction();
+
+            // Load group members to revoke their permissions
+            $group->load('groupMembers.user');
+
+            // Get all group-specific permissions
+            $groupPermissions = [
+                'view-group-' . $group->slug,
+                'edit-group-' . $group->slug,
+                'delete-group-' . $group->slug,
+                'create-groupMembers-' . $group->slug,
+                'edit-groupMembers-' . $group->slug,
+                'delete-groupMembers-' . $group->slug,
+                'view-applications-' . $group->slug,
+                'create-applications-' . $group->slug,
+                'edit-applications-' . $group->slug,
+                'delete-applications-' . $group->slug,
+            ];
+
+            // Revoke permissions from all group members
+            foreach ($group->groupMembers as $member) {
+                if ($member->user) {
+                    $member->user->revokePermissionTo($groupPermissions);
+                }
+            }
+
+            // Delete the group-specific permissions
+            Permission::whereIn('name', $groupPermissions)->delete();
+
+            // Delete the group (this will cascade delete group members due to foreign key constraints)
+            $group->delete();
+
+            DB::commit();
+
+            return redirect()
+                ->route('groups.index')
+                ->with('success', 'Group deleted successfully!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            report($e); // Log the error
+
+            return redirect()
+                ->back()
+                ->with('error', 'Failed to delete group: ' . $e->getMessage());
+        }
     }
 
+    /**
+     * Show form to add members to a group
+     *
+     * @param Group $group
+     * @return \Inertia\Response | \Illuminate\Http\RedirectResponse
+     */
     public function createGroupMembers(Group $group)
     {
-        $this->authorize(ability: 'create-groupMembers');
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
 
-        // Load group members with their user information
-        $group->load('groupMembers.user');
+        // Check if user has either global or group-specific permission
+        if (!$user->can('create-groupMembers') && !$user->can('create-groupMembers-' . $group->slug)) {
+            // Better to throw the specific permission that's required
+            $this->authorize('create-groupMembers-' . $group->slug);
+        }
 
-        // Get all existing group member user IDs
-        $existingMemberIds = $group->groupMembers->pluck('user_id')->toArray();
 
-        // Get all users except those who are already members
-        $availableUsers = User::whereNotIn('id', $existingMemberIds)->get();
+        try {
+            // Efficiently load only what's needed - just the user_id from group members
+            $group->load('groupMembers.user');
 
-        return Inertia::render('Dashboard/Groups/GroupMembers/Create', [
-            'group' => $group,
-            'users' => $availableUsers,
-        ]);
+
+            // Get existing member IDs more efficiently
+            $existingMemberIds = $group->groupMembers->pluck('user_id')->toArray();
+
+            // Get available users with pagination and minimal fields
+            $availableUsers = User::select(['id', 'email', 'full_name', 'created_at'])
+                ->whereNotIn('id', $existingMemberIds)
+                ->orderBy('full_name')
+                ->get();
+
+            return Inertia::render('Dashboard/Groups/GroupMembers/Create', [
+                'group' => $group,
+                'users' => $availableUsers,
+                'canCreateGroupMembers' => true, // We know the user has permission since they got here
+            ]);
+        } catch (\Exception $e) {
+            report($e); // Log the error
+            return redirect()->route('groups.show', $group)->with('error', 'Error loading user data: ' . $e->getMessage());
+        }
     }
 
     public function storeGroupMembers(Request $request, Group $group)
     {
-        $this->authorize(ability: 'create-groupMembers');
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        // Check if user has either global or group-specific permission
+        if (!$user->can('create-groupMembers') && !$user->can('create-groupMembers-' . $group->slug)) {
+            // Better to throw the specific permission that's required
+            $this->authorize('create-groupMembers-' . $group->slug);
+        }
 
         $validatedData = $request->validate([
             'user_id' => 'required|exists:users,id',
-            'role' => 'required|string|max:255',
+            'role' => 'required|string|max:255|in:admin,member',
         ]);
 
         try {
-            $group->groupMembers()->create($validatedData);
+            $groupMember = $group->groupMembers()->create($validatedData);
+            $user = $groupMember->user;
+            // Assign group-specific permissions to the user
+            if ($groupMember->role === 'admin') {
+                $user->givePermissionTo([
+                    'view-group-' . $group->slug,
+                    'edit-group-' . $group->slug,
+                    'delete-group-' . $group->slug,
+                    'create-groupMembers-' . $group->slug,
+                    'edit-groupMembers-' . $group->slug,
+                    'delete-groupMembers-' . $group->slug,
+                    'view-applications-' . $group->slug,
+                    'create-applications-' . $group->slug,
+                    'edit-applications-' . $group->slug,
+                    'delete-applications-' . $group->slug,
+                ]);
+            } else {
+                $user->givePermissionTo([
+                    'view-group-' . $group->slug,
+                    'view-applications-' . $group->slug,
+                ]);
+            }
             return redirect()->route('groups.show', $group)->with('success', 'Group member added successfully!');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to add group member: ' . $e->getMessage());
         }
     }
 
+    /**
+     * Update a group member's role
+     * 
+     * @param Request $request
+     * @param Group $group
+     * @param GroupMember $groupMember
+     * @return \Illuminate\Http\RedirectResponse
+     */
     public function updateGroupMembers(Request $request, Group $group, GroupMember $groupMember)
     {
-        $this->authorize(ability: 'edit-groupMembers');
+        /** @var \App\Models\User $authUser */
+        $authUser = Auth::user();
+        if (!$authUser->can('edit-groupMembers') && !$authUser->can('edit-groupMembers-' . $group->slug)) {
+            $this->authorize('edit-groupMembers-' . $group->slug);
+        }
 
         $validatedData = $request->validate([
-            'role' => 'required|string|max:255',
+            'role' => 'required|string|max:255|in:admin,member',
         ]);
 
         try {
-            $groupMember->update($validatedData);
-            return redirect()->route('groups.show', $group)->with('success', 'Group member updated successfully!');
+            $user = $groupMember->user;
+
+
+            // Handle role change
+            if ($validatedData['role'] === 'admin' && $groupMember->role !== 'admin') {
+                // Moving from member to admin - add admin permissions
+                $user->givePermissionTo([
+                    'view-group-' . $group->slug,
+                    'edit-group-' . $group->slug,
+                    'delete-group-' . $group->slug,
+                    'create-groupMembers-' . $group->slug,
+                    'edit-groupMembers-' . $group->slug,
+                    'delete-groupMembers-' . $group->slug,
+                    'view-applications-' . $group->slug,
+                    'create-applications-' . $group->slug,
+                    'edit-applications-' . $group->slug,
+                    'delete-applications-' . $group->slug,
+                ]);
+            } elseif ($validatedData['role'] !== 'admin' && $groupMember->role === 'admin') {
+                // Moving from admin to member - revoke admin permissions
+                $user->revokePermissionTo([
+                    'edit-group-' . $group->slug,
+                    'delete-group-' . $group->slug,
+                    'create-groupMembers-' . $group->slug,
+                    'edit-groupMembers-' . $group->slug,
+                    'delete-groupMembers-' . $group->slug,
+                    'create-applications-' . $group->slug,
+                    'edit-applications-' . $group->slug,
+                    'delete-applications-' . $group->slug,
+                ]);
+
+                // Keep basic member permissions
+                $user->givePermissionTo([
+                    'view-group-' . $group->slug,
+                    'view-applications-' . $group->slug,
+                ]);
+            }
+
+            // Update the group member's role
+            $groupMember->role = $validatedData['role'];
+
+            $groupMember->save();
+
+            return redirect()
+                ->route('groups.show', $group)
+                ->with('success', 'Group member updated successfully!');
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Failed to update group member: ' . $e->getMessage());
+            report($e); // Log the error
+            return redirect()
+                ->back()
+                ->with('error', 'Failed to update group member: ' . $e->getMessage());
         }
     }
 
@@ -188,7 +402,32 @@ class GroupController extends Controller
         $this->authorize(ability: 'delete-groupMembers');
 
         try {
+            if ($groupMember->role === 'admin') {
+                // Remove group-specific permissions from the user
+                $user = $groupMember->user;
+                $user->revokePermissionTo([
+                    'view-group-' . $group->slug,
+                    'edit-group-' . $group->slug,
+                    'delete-group-' . $group->slug,
+                    'view-groupMembers-' . $group->slug,
+                    'create-groupMembers-' . $group->slug,
+                    'edit-groupMembers-' . $group->slug,
+                    'delete-groupMembers-' . $group->slug,
+                    'view-applications-' . $group->slug,
+                    'create-applications-' . $group->slug,
+                    'edit-applications-' . $group->slug,
+                    'delete-applications-' . $group->slug,
+                ]);
+            } else {
+                // Remove only the view-group and view-applications permissions
+                $user = $groupMember->user;
+                $user->revokePermissionTo([
+                    'view-group-' . $group->slug,
+                    'view-applications-' . $group->slug,
+                ]);
+            }
             $groupMember->delete();
+
             return redirect()->route('groups.show', $group)->with('success', 'Group member removed successfully!');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to remove group member: ' . $e->getMessage());

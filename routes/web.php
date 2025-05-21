@@ -20,11 +20,14 @@ Route::get('/', function () {
     ]);
 });
 
-Route::prefix('/dashboard')->group(function () {
+Route::prefix('dashboard')->group(function () {
     Route::get('/', function () {
         return Inertia::render('Dashboard/Index');
     })->name('dashboard');
+
     Route::resource('groups', GroupController::class);
+    Route::resource('applications', ApplicationController::class);
+
     Route::prefix('groups/{group}')->group(function () {
         Route::get('/groupMembers/create', [GroupController::class, 'createGroupMembers'])->name('groups.groupMembers.create');
         Route::post('groupMembers', [GroupController::class, 'storeGroupMembers'])->name('groups.groupMembers.store');
@@ -46,20 +49,10 @@ Route::prefix('/dashboard')->group(function () {
         Route::put('envVariables/{envVariable}', [ApplicationController::class, 'updateEnvVariables'])->name('applications.envVariables.update');
         Route::delete('envVariables/{envVariable}', [ApplicationController::class, 'destroyEnvVariables'])->name('applications.envVariables.destroy');
 
-        Route::get('accessKeys/create', [ApplicationController::class, 'createAccessKeys'])->name('applications.accessKeys.create');
-        Route::post('accessKeys', [ApplicationController::class, 'storeAccessKeys'])->name('applications.accessKeys.store');
-        Route::get('accessKeys/{accessKey}/edit', [ApplicationController::class, 'editAccessKeys'])->name('applications.accessKeys.edit');
-        Route::put('accessKeys/{accessKey}', [ApplicationController::class, 'updateAccessKeys'])->name('applications.accessKeys.update');
-
-        Route::delete('accessKeys/{accessKey}', [ApplicationController::class, 'destroyAccessKeys'])->name('applications.accessKeys.destroy');
-        Route::get('env-values/{envTypeId}', [ApplicationController::class, 'getEnvValuesByType'])
-            ->name('applications.envValues.byType');
-
         Route::put('envValues/{envValue}', [ApplicationController::class, 'updateEnvValue'])
             ->name('applications.envValues.update');
     });
 
-    Route::resource('applications', ApplicationController::class);
 
     Route::resource('envValueChanges', EnvValueChangeController::class)->except(['create', 'edit']);
 

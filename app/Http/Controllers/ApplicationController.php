@@ -13,6 +13,7 @@ use App\Http\Requests\UpdateEnvVariableRequest;
 use App\Models\AccessKey;
 use App\Models\EnvType;
 use App\Models\EnvValue;
+use App\Models\EnvValueChange;
 use App\Models\EnvVariable;
 use App\Models\Group;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -67,43 +68,47 @@ class ApplicationController extends Controller
      */
     public function store(StoreApplicationRequest $request)
     {
-        //
         $this->authorize('create-applications');
 
         $validatedData = $request->validated();
+
         try {
+            DB::beginTransaction();
+
             $validatedData['slug'] = str($validatedData['name'])->slug()->toString();
-            Application::create($validatedData);
-            return redirect()->route('applications.index')->with('success', 'Application created successfully!');
+
+            $application = Application::create($validatedData);
+
+            $envTypes = EnvType::all();
+
+            foreach ($envTypes as $envType) {
+                AccessKey::create([
+                    'application_id' => $application->id,
+                    'env_type_id' => $envType->id,
+                    'key' => str()->random(32),
+                ]);
+            }
+
+            DB::commit();
+
+            return redirect()
+                ->route('applications.index')
+                ->with('success', 'Application created successfully with access keys for all environment types!');
         } catch (\Exception $e) {
+            DB::rollBack();
+
             Log::error('Failed to create application: ' . $e->getMessage(), [
                 'request' => $request->all(),
                 'user_id' => Auth::id(),
+                'trace' => $e->getTraceAsString(),
             ]);
-            return redirect()->back()->with('error', 'Failed to create application: ' . $e->getMessage());
+
+            return redirect()
+                ->back()
+                ->with('error', 'Failed to create application: ' . $e->getMessage());
         }
     }
 
-    public function getEnvValuesByType(Application $application, $envTypeId)
-    {
-        $this->authorize('view-applications');
-
-        // Find the access key for this application+envType combination
-        $accessKey = AccessKey::where('application_id', $application->id)
-            ->where('env_type_id', $envTypeId)
-            ->first();
-
-        if (!$accessKey) {
-            return response()->json([]);
-        }
-
-        // Get all env values for this access key with their associated variables
-        $envValues = $accessKey->envValues()
-            ->with('envVariable')
-            ->get();
-
-        return response()->json($envValues);
-    }
     /**
      * Display the specified resource.
      */
@@ -111,18 +116,16 @@ class ApplicationController extends Controller
     {
         $this->authorize('view-applications');
 
-        // Eager load all necessary relationships with proper nesting
         $application->load([
             'group',
             'envVariables' => function ($query) {
                 $query->orderBy('sequence', 'asc')->orderBy('name', 'asc');
             },
-            'envVariables.envValues',
-            'accessKeys',
+            'envVariables.envValues.accessKey',
+            'envVariables.envValues.accessKey.envType',
             'accessKeys.envType',
-            'accessKeys.envValues',
-            'accessKeys.envValues.envVariable'
         ]);
+
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
@@ -130,7 +133,6 @@ class ApplicationController extends Controller
         // Get unique environment types from access keys
         $envTypes = $application->accessKeys->pluck('envType')->unique('id')->values();
 
-        // Calculate statistics for the details tab
         $envValuesCount = $application->envVariables->reduce(function ($count, $variable) {
             return $count + ($variable->envValues ? $variable->envValues->count() : 0);
         }, 0);
@@ -146,9 +148,6 @@ class ApplicationController extends Controller
             'canEditEnvVariables' => $user->can('edit-env-variables'),
             'canDeleteEnvVariables' => $user->can('delete-env-variables'),
             'canCreateEnvVariables' => $user->can('create-env-variables'),
-            'canEditAccessKeys' => $user->can('edit-access-keys'),
-            'canDeleteAccessKeys' => $user->can('delete-access-keys'),
-            'canCreateAccessKeys' => $user->can('create-access-keys'),
             'canEditEnvValues' => $user->can('edit-env-values'),
         ]);
     }
@@ -207,110 +206,7 @@ class ApplicationController extends Controller
         }
     }
 
-    public function createAccessKeys(Application $application)
-    {
-        $this->authorize('create-access-keys');
 
-        $application->load(['accessKeys.envType']);
-
-        $usedEnvTypeIds = $application->accessKeys->pluck('env_type_id')->toArray();
-
-        $availableEnvTypes = EnvType::whereNotIn('id', $usedEnvTypeIds)->get();
-
-        return Inertia::render('Dashboard/Applications/AccessKeys/Create', [
-            'application' => $application,
-            'envTypes' => $availableEnvTypes,
-            'hasUsedAllEnvTypes' => $availableEnvTypes->isEmpty(),
-            'usedEnvTypes' => EnvType::whereIn('id', $usedEnvTypeIds)->get(),
-        ]);
-    }
-    public function storeAccessKeys(StoreAccessKeyRequest $request, Application $application)
-    {
-        //
-        $this->authorize('create-access-keys');
-        $validatedData = $request->validated();
-        try {
-            // Start a database transaction
-            DB::beginTransaction();
-
-            // Create the access key
-            $validatedData['application_id'] = $application->id;
-            $accessKey = AccessKey::create($validatedData);
-
-            // Get all environment variables for this application
-            $envVariables = $application->envVariables;
-
-            // Create empty env values for each environment variable
-            foreach ($envVariables as $envVariable) {
-                EnvValue::create([
-                    'env_variable_id' => $envVariable->id,
-                    'access_key_id' => $accessKey->id,
-                    'value' => '', // Empty value by default
-                ]);
-            }
-
-            DB::commit();
-
-            return redirect()->route('applications.show', $application)->with('success', 'Access key created successfully!');
-        } catch (\Exception $e) {
-            // Rollback the transaction if any error occurs
-            DB::rollBack();
-
-            Log::error('Failed to create access key: ' . $e->getMessage(), [
-                'request' => $request->all(),
-                'user_id' => Auth::id(),
-            ]);
-            return redirect()->back()->with('error', 'Failed to create access key: ' . $e->getMessage());
-        }
-    }
-
-    public function editAccessKeys(Application $application, AccessKey $accessKey)
-    {
-        //
-        $this->authorize('edit-access-keys');
-        $application->load(['accessKeys.envType']);
-        $accessKey->load(['envType']);
-        $usedEnvTypeIds = $application->accessKeys->pluck('env_type_id')->toArray();
-        $availableEnvTypes = EnvType::whereNotIn('id', $usedEnvTypeIds)->get();
-        return Inertia::render('Dashboard/Applications/AccessKeys/Edit', [
-            'application' => $application,
-            'accessKey' => $accessKey,
-            'envTypes' => $availableEnvTypes,
-            'hasUsedAllEnvTypes' => $availableEnvTypes->isEmpty(),
-            'usedEnvTypes' => EnvType::whereIn('id', $usedEnvTypeIds)->get(),
-        ]);
-    }
-
-    public function updateAccessKeys(UpdateAccessKeyRequest $request, Application $application, AccessKey $accessKey)
-    {
-        //
-        $validatedData = $request->validated();
-        try {
-            $accessKey->update($validatedData);
-            return redirect()->route('applications.show', $application)->with('success', 'Access key updated successfully!');
-        } catch (\Exception $e) {
-            Log::error('Failed to update access key: ' . $e->getMessage(), [
-                'request' => $request->all(),
-                'user_id' => Auth::id(),
-            ]);
-            return redirect()->back()->with('error', 'Failed to update access key: ' . $e->getMessage());
-        }
-    }
-
-    public function destroyAccessKeys(Application $application, AccessKey $accessKey)
-    {
-        //
-        $this->authorize('delete-access-keys');
-        try {
-            $accessKey->delete();
-            return redirect()->route('applications.show', $application)->with('success', 'Access key deleted successfully!');
-        } catch (\Exception $e) {
-            Log::error('Failed to delete access key: ' . $e->getMessage(), [
-                'user_id' => Auth::id(),
-            ]);
-            return redirect()->back()->with('error', 'Failed to delete access key: ' . $e->getMessage());
-        }
-    }
 
     public function createEnvVariables(Application $application)
     {
@@ -324,36 +220,62 @@ class ApplicationController extends Controller
 
     public function storeEnvVariables(StoreEnvVariableRequest $request, Application $application)
     {
-        //
         $this->authorize('create-env-variables');
         $validatedData = $request->validated();
+
         try {
-            // Start a database transaction
             DB::beginTransaction();
 
-            // Create the environment variable
             $envVariable = EnvVariable::create([
                 'name' => $validatedData['name'],
                 'application_id' => $validatedData['application_id'],
                 'sequence' => $validatedData['sequence'] ?? null,
             ]);
 
-            // Get all access keys for this application
             $accessKeys = $application->accessKeys;
 
-            // Create empty env values for this variable in all access keys
+            $envTypeMap = [
+                'production_value' => 'Production',
+                'staging_value' => 'Staging',
+                'development_value' => 'Development',
+            ];
+
             foreach ($accessKeys as $accessKey) {
-                EnvValue::create([
+                $envTypeName = $accessKey->envType->name ?? null;
+                $valueKey = array_search($envTypeName, $envTypeMap);
+                $value = '';
+                if ($valueKey && isset($validatedData[$valueKey])) {
+                    $value = $validatedData[$valueKey];
+                }
+
+                $envValue = EnvValue::create([
                     'env_variable_id' => $envVariable->id,
                     'access_key_id' => $accessKey->id,
-                    'value' => '', // Empty value by default
+                    'value' => $value,
+                ]);
+
+                // Record the change
+                EnvValueChange::create([
+                    'env_value_id' => $envValue->id,
+                    'user_id' => Auth::id(),
+                    'old_value' => null,
+                    'new_value' => $value ?: null,
+                    'type' => 'create',
                 ]);
             }
 
             // Commit the transaction
             DB::commit();
 
-            return redirect()->route('applications.show', $application)->with('success', 'Env variable created successfully!');
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Env variable created successfully!'
+                ]);
+            }
+
+            return redirect()->route('applications.show', $application)
+                ->with('success', 'Env variable created successfully!');
         } catch (\Exception $e) {
             // Rollback the transaction if any error occurs
             DB::rollBack();
@@ -361,7 +283,16 @@ class ApplicationController extends Controller
             Log::error('Failed to create env variable: ' . $e->getMessage(), [
                 'request' => $request->all(),
                 'user_id' => Auth::id(),
+                'trace' => $e->getTraceAsString(),
             ]);
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to create env variable: ' . $e->getMessage()
+                ], 500);
+            }
+
             return redirect()->back()->with('error', 'Failed to create env variable: ' . $e->getMessage());
         }
     }
@@ -378,19 +309,98 @@ class ApplicationController extends Controller
 
     public function updateEnvVariables(UpdateEnvVariableRequest $request, Application $application, EnvVariable $envVariable)
     {
-        //
+        $this->authorize('edit-env-variables');
         $validatedData = $request->validated();
+
         try {
-            $envVariable->update($validatedData);
-            return redirect()->route('applications.show', $application)->with('success', 'Env variable updated successfully!');
+            DB::beginTransaction();
+
+            // Update the env variable
+            $envVariable->update([
+                'name' => $validatedData['name'],
+                'sequence' => $validatedData['sequence'] ?? null,
+            ]);
+
+            $accessKeys = $application->accessKeys;
+
+            $envTypeMap = [
+                'production_value' => 'Production',
+                'staging_value' => 'Staging',
+                'development_value' => 'Development',
+            ];
+
+            foreach ($accessKeys as $accessKey) {
+                $envTypeName = $accessKey->envType->name ?? null;
+                $valueKey = strtolower(str_replace(' ', '_', $envTypeName)) . '_value';
+
+                // Find the existing env value for this access key
+                $envValue = EnvValue::where('env_variable_id', $envVariable->id)
+                    ->where('access_key_id', $accessKey->id)
+                    ->first();
+
+                $oldValue = $envValue ? $envValue->value : null;
+                $newValue = isset($validatedData[$valueKey]) ? $validatedData[$valueKey] : '';
+
+                if ($envValue) {
+                    // Update existing env value
+                    $envValue->update([
+                        'value' => $newValue,
+                    ]);
+                } else {
+                    // Create new env value if it doesn't exist
+                    $envValue = EnvValue::create([
+                        'env_variable_id' => $envVariable->id,
+                        'access_key_id' => $accessKey->id,
+                        'value' => $newValue,
+                    ]);
+                }
+
+                // Only record the change if the value has actually changed
+                if ($oldValue !== $newValue) {
+                    // Record the change
+                    EnvValueChange::create([
+                        'env_value_id' => $envValue->id,
+                        'user_id' => Auth::id(),
+                        'old_value' => $oldValue,
+                        'new_value' => $newValue ?: null,
+                        'type' => 'update',
+                    ]);
+                }
+            }
+
+            // Commit the transaction
+            DB::commit();
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Env variable updated successfully!'
+                ]);
+            }
+
+            return redirect()->route('applications.show', $application)
+                ->with('success', 'Env variable updated successfully!');
         } catch (\Exception $e) {
+            // Rollback the transaction if any error occurs
+            DB::rollBack();
+
             Log::error('Failed to update env variable: ' . $e->getMessage(), [
                 'request' => $request->all(),
                 'user_id' => Auth::id(),
+                'trace' => $e->getTraceAsString(),
             ]);
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to update env variable: ' . $e->getMessage()
+                ], 500);
+            }
+
             return redirect()->back()->with('error', 'Failed to update env variable: ' . $e->getMessage());
         }
     }
+
     public function destroyEnvVariables(Application $application, EnvVariable $envVariable)
     {
         //
@@ -414,11 +424,21 @@ class ApplicationController extends Controller
         $validated = $request->validate([
             'value' => 'nullable|string',
         ]);
+        EnvValueChange::create([
+            'env_value_id' => $envValue->id,
+            'user_id' => Auth::id(),
+            'old_value' => $envValue->value,
+            'new_value' => $validated['value'],
+            'type' => 'update',
+        ]);
 
         // Update the environment value
         $envValue->update([
             'value' => $validated['value'],
         ]);
+
+        // Log the change
+
 
         return Redirect::back()->with('success', 'Env value updated successfully!');
     }

@@ -55,8 +55,8 @@ class User extends Authenticatable
         return $this->hasMany(GroupMember::class, 'user_id', 'id');
     }
 
-    public function envVariableChanges(): HasMany
+    public function envValueChanges(): HasMany
     {
-        return $this->hasMany(EnvVariableChange::class, 'user_id', 'id');
+        return $this->hasMany(EnvValueChange::class, 'user_id', 'id');
     }
 }

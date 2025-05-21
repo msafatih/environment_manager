@@ -19,18 +19,35 @@ class EnvValueChangeController extends Controller
      */
     public function index()
     {
-        //
-        $this->authorize(ability: 'view-env-variable-changes');
+        $this->authorize(ability: 'view-env-value-changes');
 
-        $envVariableChanges = EnvValueChange::orderBy('created_at', 'desc')
-            ->with(['user', 'application'])
-            ->get();
+        // The issue is in the relation paths - we need to make sure the application data is available
+        $envValueChanges = EnvValueChange::orderBy('created_at', 'desc')
+            ->with([
+                'user',
+                'envValue',
+                'envValue.envVariable',
+                'envValue.envVariable.application',
+                'envValue.accessKey',
+                'envValue.accessKey.envType',
+            ])
+            ->get()
+            ->map(function ($change) {
+                // Ensure application ID is properly set for route generation
+                if ($change->envValue && $change->envValue->accessKey && $change->envValue->accessKey->application) {
+                    // This ensures the application has an ID to avoid the Ziggy error
+                    $change->envValue->accessKey->application->makeVisible('id');
+                }
+                return $change;
+            });
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        return Inertia::render('Dashboard/EnvVariableChanges/Index', [
-            'envVariableChanges' => $envVariableChanges,
-            'canShowEnvVariableChanges' => $user->can('view-env-variable-changes'),
+
+        return Inertia::render('Dashboard/EnvValueChanges/Index', [
+            'envValueChanges' => $envValueChanges,
+            'canShowEnvValueChanges' => $user->can('view-env-value-changes'),
+            'canViewApplications' => $user->can('view-applications'),  // Add permission check
         ]);
     }
 

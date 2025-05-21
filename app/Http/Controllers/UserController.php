@@ -78,11 +78,56 @@ class UserController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * Display the specified user including their groups, roles and permissions.
+     *
+     * @param User $user
+     * @return \Inertia\Response
      */
     public function show(User $user)
     {
-        //
+        // Authorize the action
+        $this->authorize(ability: 'view-users');
+
+        // Load relationships for the user
+        $user->load([
+            'roles.permissions',
+            'permissions',
+            'groupMembers',
+            'groupMembers.group'
+        ]);
+
+        // Get all direct permissions
+        $directPermissions = $user->getDirectPermissions()->values();
+
+        // Get all permissions including those from roles
+        $allPermissions = $user->getAllPermissions()->values();
+
+        // Calculate permissions inherited exclusively from roles
+        $rolePermissions = $allPermissions->filter(function ($permission) use ($directPermissions) {
+            return !$directPermissions->contains('id', $permission->id);
+        })->values();
+
+
+        // Group permissions by category for better UI organization
+        $permissionsByCategory = $allPermissions->groupBy(function ($permission) {
+            $parts = explode('-', $permission->name);
+            if (count($parts) >= 2) {
+                return $parts[1]; // The resource/category part (e.g., "users" from "create-users")
+            }
+            return 'other';
+        });
+
+
+        return Inertia::render('Dashboard/Users/Show', [
+            'user' => $user,
+            'roles' => $user->roles,
+            'direct_permissions' => $directPermissions,
+            'role_permissions' => $rolePermissions,
+            'permissions_by_category' => $permissionsByCategory->map(function ($permissions) {
+                return $permissions->map->only(['id', 'name', 'guard_name']);
+            }),
+
+        ]);
     }
 
     /**

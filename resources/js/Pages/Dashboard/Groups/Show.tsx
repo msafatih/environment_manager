@@ -69,23 +69,18 @@ import type { Application, Group, GroupMember, PageProps } from "@/types";
 
 interface GroupShowProps extends PageProps {
     group: Group;
-    canAddGroupMembers: boolean;
+    canCreateGroupMembers: boolean;
     canEditGroupMembers: boolean;
     canDeleteGroupMembers: boolean;
-    canAddApplications: boolean;
-    canEditApplications: boolean;
-    canDeleteApplications: boolean;
+    canViewApplications: boolean;
 }
-
 const GroupShow = () => {
     const {
         group,
-        canAddGroupMembers,
+        canCreateGroupMembers,
         canEditGroupMembers,
         canDeleteGroupMembers,
-        canAddApplications,
-        canEditApplications,
-        canDeleteApplications,
+        canViewApplications,
     } = usePage<GroupShowProps>().props;
 
     const [activeTab, setActiveTab] = useState("members");
@@ -344,7 +339,7 @@ const GroupShow = () => {
                                 <Users className="h-6 w-6" />
                             </div>
                         </div>
-                        {canAddGroupMembers && (
+                        {canCreateGroupMembers && (
                             <CardFooter className="px-0 pt-4 pb-0">
                                 <Link
                                     href={route("groups.groupMembers.create", {
@@ -378,19 +373,6 @@ const GroupShow = () => {
                                 <Layers className="h-6 w-6" />
                             </div>
                         </div>
-                        {canAddApplications && (
-                            <CardFooter className="px-0 pt-4 pb-0">
-                                <Link
-                                    href={route("groups.applications.create", {
-                                        group: group,
-                                    })}
-                                    className="text-purple-600 text-sm font-medium hover:underline flex items-center gap-1"
-                                >
-                                    Add application{" "}
-                                    <ChevronRight className="h-3 w-3" />
-                                </Link>
-                            </CardFooter>
-                        )}
                     </CardContent>
                 </Card>
 
@@ -474,7 +456,7 @@ const GroupShow = () => {
                                 <Users className="h-5 w-5 text-blue-600" />
                                 Group Members
                             </CardTitle>
-                            {canAddGroupMembers && (
+                            {canCreateGroupMembers && (
                                 <Link
                                     href={route("groups.groupMembers.create", {
                                         group: group,
@@ -687,7 +669,7 @@ const GroupShow = () => {
                                         Add members to grant them access to
                                         group resources.
                                     </p>
-                                    {canAddGroupMembers && (
+                                    {canCreateGroupMembers && (
                                         <Link
                                             href={route(
                                                 "groups.groupMembers.create",
@@ -714,21 +696,6 @@ const GroupShow = () => {
                                 <Layers className="h-5 w-5 text-purple-600" />
                                 Applications
                             </CardTitle>
-                            {canAddApplications && (
-                                <Link
-                                    href={route("groups.applications.create", {
-                                        group: group,
-                                    })}
-                                >
-                                    <Button
-                                        size="sm"
-                                        className="gap-1 bg-purple-600 hover:bg-purple-700"
-                                    >
-                                        <PlusCircle className="h-4 w-4" /> Add
-                                        Application
-                                    </Button>
-                                </Link>
-                            )}
                         </CardHeader>
                         <CardContent className="p-0">
                             {group.applications.length > 0 ? (
@@ -788,42 +755,21 @@ const GroupShow = () => {
                                                                     align="end"
                                                                     className="w-48"
                                                                 >
-                                                                    {canEditApplications && (
+                                                                    {canViewApplications && (
                                                                         <DropdownMenuItem
                                                                             asChild
                                                                         >
                                                                             <Link
                                                                                 href={route(
-                                                                                    "groups.applications.edit",
-                                                                                    [
-                                                                                        group,
-                                                                                        app,
-                                                                                    ]
+                                                                                    "applications.show",
+                                                                                    app.id
                                                                                 )}
                                                                             >
-                                                                                <Edit className="mr-2 h-4 w-4" />{" "}
-                                                                                Edit
+                                                                                <Eye className="mr-2 h-4 w-4" />{" "}
+                                                                                View
                                                                                 Application
                                                                             </Link>
                                                                         </DropdownMenuItem>
-                                                                    )}
-                                                                    {canDeleteApplications && (
-                                                                        <>
-                                                                            <DropdownMenuSeparator />
-                                                                            <DropdownMenuItem
-                                                                                className="text-red-600"
-                                                                                onClick={() =>
-                                                                                    handleDeleteApplication(
-                                                                                        app,
-                                                                                        app.name
-                                                                                    )
-                                                                                }
-                                                                            >
-                                                                                <Trash className="mr-2 h-4 w-4" />{" "}
-                                                                                Delete
-                                                                                Application
-                                                                            </DropdownMenuItem>
-                                                                        </>
                                                                     )}
                                                                 </DropdownMenuContent>
                                                             </DropdownMenu>
@@ -871,19 +817,6 @@ const GroupShow = () => {
                                         yet. Add applications to organize your
                                         software resources.
                                     </p>
-                                    {canAddApplications && (
-                                        <Link
-                                            href={route(
-                                                "groups.applications.create",
-                                                { group: group }
-                                            )}
-                                        >
-                                            <Button className="gap-1 bg-purple-600 hover:bg-purple-700">
-                                                <PlusCircle className="h-4 w-4" />{" "}
-                                                Add First Application
-                                            </Button>
-                                        </Link>
-                                    )}
                                 </div>
                             )}
                         </CardContent>
@@ -939,20 +872,11 @@ const GroupShow = () => {
                                             <SelectValue placeholder="Select a role" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="owner">
-                                                Owner
-                                            </SelectItem>
                                             <SelectItem value="admin">
                                                 Admin
                                             </SelectItem>
-                                            <SelectItem value="editor">
-                                                Editor
-                                            </SelectItem>
                                             <SelectItem value="member">
                                                 Member
-                                            </SelectItem>
-                                            <SelectItem value="viewer">
-                                                Viewer
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>

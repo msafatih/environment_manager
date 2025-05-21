@@ -16,7 +16,7 @@ class RolePermissionSeeder extends Seeder
     {
         //
         $super_admin = Role::create(['name' => 'super-admin']);
-        Role::create(['name' => 'programmer']);
+        $programmer = Role::create(['name' => 'programmer']);
         Role::create(['name' => 'supervisor']);
         Role::create(['name' => 'user']);
 
@@ -82,8 +82,24 @@ class RolePermissionSeeder extends Seeder
         Permission::create(['name' => 'edit-permissions']);
         Permission::create(['name' => 'delete-permissions']);
 
-        Permission::create(['name' => 'view-env-variable-changes']);
+        Permission::create(['name' => 'view-env-value-changes']);
+        Permission::create(['name' => 'create-env-value-changes']);
+        Permission::create(['name' => 'edit-env-value-changes']);
+        Permission::create(['name' => 'delete-env-value-changes']);
 
         $super_admin->givePermissionTo(Permission::all());
+
+        $programmer->givePermissionTo([
+            'view-dashboard',
+            'view-groups',
+            'view-applications',
+            'view-development',
+            'create-development',
+            'edit-development',
+            'view-staging',
+            'create-staging',
+            'edit-staging',
+
+        ]);
     }
 }

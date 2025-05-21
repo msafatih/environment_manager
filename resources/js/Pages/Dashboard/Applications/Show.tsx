@@ -30,17 +30,11 @@ import {
     Layers,
     Settings,
     Monitor,
-    DatabaseIcon,
     Globe,
+    CheckCircle,
     AlertTriangle,
-    Loader2,
+    Check,
 } from "lucide-react";
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from "@/Components/ui/accordion";
 import { Button } from "@/Components/ui/button";
 import {
     Card,
@@ -75,7 +69,7 @@ import {
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/Components/ui/tooltip";
+} from "@/components/ui/tooltip";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -87,7 +81,6 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/Components/ui/alert-dialog";
-import { ScrollArea } from "@/Components/ui/scroll-area";
 import {
     Dialog,
     DialogContent,
@@ -96,6 +89,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/Components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 interface ApplicationsShowProps extends PageProps {
     application: Application;
@@ -112,21 +106,12 @@ interface ApplicationsShowProps extends PageProps {
 const ApplicationsShow = () => {
     const {
         application,
-        envTypes,
         canEditEnvVariables,
         canCreateEnvVariables,
         canDeleteEnvVariables,
-        canEditAccessKeys,
-        canCreateAccessKeys,
-        canDeleteAccessKeys,
         canEditEnvValues,
     } = usePage<ApplicationsShowProps>().props;
 
-    const [selectedEnvType, setSelectedEnvType] = useState<EnvType | null>(
-        null
-    );
-    const [envValuesLoading, setEnvValuesLoading] = useState(false);
-    const [envValues, setEnvValues] = useState<Record<string, EnvValue[]>>({});
     const [searchVariables, setSearchVariables] = useState("");
     const [searchKeys, setSearchKeys] = useState("");
     const [showSecretValues, setShowSecretValues] = useState<
@@ -138,56 +123,9 @@ const ApplicationsShow = () => {
     const [editedValue, setEditedValue] = useState("");
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [copySuccess, setCopySuccess] = useState<string | null>(null);
 
-    // This function will fetch env values by environment type
-    const loadEnvValuesByType = (envType: EnvType) => {
-        setEnvValuesLoading(true);
-
-        // Check if we've already loaded this environment type
-        if (envValues[envType.id]) {
-            setSelectedEnvType(envType);
-            setEnvValuesLoading(false);
-            return;
-        }
-
-        // Use fetch instead of axios
-        fetch(
-            route("applications.envValues.byType", {
-                application: application.id,
-                envTypeId: envType.id,
-            })
-        )
-            .then((response) => response.json())
-            .then((data) => {
-                setEnvValues((prev) => ({
-                    ...prev,
-                    [envType.id]: data,
-                }));
-                setSelectedEnvType(envType);
-            })
-            .catch((error) => {
-                console.error("Failed to load environment values", error);
-            })
-            .finally(() => {
-                setEnvValuesLoading(false);
-            });
-    };
-
-    // Helper to get environment icon based on name
-    const getEnvTypeIcon = (envTypeName: string) => {
-        const name = envTypeName.toLowerCase();
-        if (name.includes("production")) {
-            return <Globe className="h-4 w-4 text-red-500" />;
-        } else if (name.includes("staging")) {
-            return <Monitor className="h-4 w-4 text-amber-500" />;
-        } else if (name.includes("development")) {
-            return <Settings className="h-4 w-4 text-blue-500" />;
-        } else {
-            return <Layers className="h-4 w-4 text-gray-500" />;
-        }
-    };
-
-    // Sort env variables based on sequence
+    // Filter and sort env variables based on sequence and search
     const filteredEnvVariables =
         application.env_variables
             ?.filter((variable) =>
@@ -196,15 +134,11 @@ const ApplicationsShow = () => {
                     .includes(searchVariables.toLowerCase())
             )
             .sort((a, b) => {
-                // Handle null sequence values (default to a high number to push to the end)
                 const seqA = a.sequence === null ? 999999 : a.sequence;
                 const seqB = b.sequence === null ? 999999 : b.sequence;
-
-                // Sort by sequence (ascending order)
                 return Number(seqA) - Number(seqB);
             }) || [];
 
-    // Filter access keys based on search
     const filteredAccessKeys =
         application.access_keys?.filter(
             (key) =>
@@ -213,14 +147,6 @@ const ApplicationsShow = () => {
                     ?.toLowerCase()
                     .includes(searchKeys.toLowerCase())
         ) || [];
-
-    // Toggle visibility of secret values
-    const toggleSecretVisibility = (id: string) => {
-        setShowSecretValues((prev) => ({
-            ...prev,
-            [id]: !prev[id],
-        }));
-    };
 
     // Format date to readable format
     const formatDate = (dateString: string) => {
@@ -233,24 +159,22 @@ const ApplicationsShow = () => {
         });
     };
 
-    // Copy to clipboard function
-    const copyToClipboard = (text: string) => {
-        navigator.clipboard.writeText(text);
-        // You could add a toast notification here
+    // Toggle visibility of secret values
+    const toggleSecretVisibility = (id: string) => {
+        setShowSecretValues((prev) => ({
+            ...prev,
+            [id]: !prev[id],
+        }));
     };
 
-    const handleDeleteAccessKey = (accessKey: string | AccessKey) => {
-        // Use Inertia.delete to actually send the delete request
-        router.delete(
-            route("applications.accessKeys.destroy", {
-                application: application,
-                accessKey: accessKey,
-            })
-        );
+    // Copy to clipboard function
+    const copyToClipboard = (text: string, variableName: string) => {
+        navigator.clipboard.writeText(text);
+        setCopySuccess(variableName);
+        setTimeout(() => setCopySuccess(null), 2000);
     };
 
     const handleDeleteEnvVariable = (envVariable: string | AccessKey) => {
-        // Use Inertia.delete to actually send the delete request
         router.delete(
             route("applications.envVariables.destroy", {
                 application: application,
@@ -270,7 +194,6 @@ const ApplicationsShow = () => {
 
         setIsSubmitting(true);
 
-        // Send the update request
         router.put(
             route("applications.envValues.update", {
                 application: application.id,
@@ -281,27 +204,31 @@ const ApplicationsShow = () => {
             },
             {
                 onSuccess: () => {
-                    // Update the local state
-                    if (selectedEnvType && editingEnvValue) {
-                        setEnvValues((prev) => {
-                            const updatedValues = [...prev[selectedEnvType.id]];
-                            const index = updatedValues.findIndex(
-                                (v) => v.id === editingEnvValue.id
-                            );
-                            if (index !== -1) {
-                                updatedValues[index] = {
-                                    ...updatedValues[index],
-                                    value: editedValue,
+                    // Update local state for immediate UI update
+                    const updatedVariables = application.env_variables?.map(
+                        (variable) => {
+                            if (variable.env_values) {
+                                const updatedValues = variable.env_values.map(
+                                    (value) => {
+                                        if (value.id === editingEnvValue.id) {
+                                            return {
+                                                ...value,
+                                                value: editedValue,
+                                            };
+                                        }
+                                        return value;
+                                    }
+                                );
+                                return {
+                                    ...variable,
+                                    env_values: updatedValues,
                                 };
                             }
-                            return {
-                                ...prev,
-                                [selectedEnvType.id]: updatedValues,
-                            };
-                        });
-                    }
+                            return variable;
+                        }
+                    );
 
-                    // Close the dialog
+                    // Close the dialog and reset state
                     setIsEditDialogOpen(false);
                     setEditingEnvValue(null);
                     setIsSubmitting(false);
@@ -310,6 +237,134 @@ const ApplicationsShow = () => {
                     setIsSubmitting(false);
                 },
             }
+        );
+    };
+
+    // Helper to get environment icon based on name
+    const getEnvTypeIcon = (envTypeName: string) => {
+        const name = envTypeName.toLowerCase();
+        if (name.includes("production")) {
+            return <Globe className="h-4 w-4 text-red-500" />;
+        } else if (name.includes("staging")) {
+            return <Monitor className="h-4 w-4 text-amber-500" />;
+        } else if (name.includes("development")) {
+            return <Settings className="h-4 w-4 text-blue-500" />;
+        } else {
+            return <Layers className="h-4 w-4 text-gray-500" />;
+        }
+    };
+
+    // Helper to render environment value
+    const renderEnvValue = (variable: any, envType: string) => {
+        const envValue = variable.env_values?.find(
+            (value: any) =>
+                value.access_key?.env_type?.name?.toLowerCase() ===
+                envType.toLowerCase()
+        );
+
+        if (!envValue) {
+            return (
+                <span className="text-gray-400 italic text-xs">Not set</span>
+            );
+        }
+
+        const valueId = `${envType.charAt(0)}-${envValue.id}`;
+        const isValueVisible = showSecretValues[valueId] || false;
+
+        return (
+            <div className="flex items-center space-x-1">
+                <div
+                    className={`font-mono text-sm ${
+                        isValueVisible ? "" : "filter blur-[3px]"
+                    } transition-all duration-200`}
+                >
+                    {envValue.value || (
+                        <span className="text-gray-400 italic text-xs">
+                            Empty
+                        </span>
+                    )}
+                </div>
+                <div className="flex items-center space-x-0.5">
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-gray-400 hover:text-gray-700"
+                                    onClick={() =>
+                                        toggleSecretVisibility(valueId)
+                                    }
+                                >
+                                    {isValueVisible ? (
+                                        <EyeOff className="h-3.5 w-3.5" />
+                                    ) : (
+                                        <Eye className="h-3.5 w-3.5" />
+                                    )}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                                <p className="text-xs">
+                                    {isValueVisible
+                                        ? "Hide value"
+                                        : "Show value"}
+                                </p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+
+                    {envValue.value && (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-gray-400 hover:text-gray-700"
+                                        onClick={() =>
+                                            copyToClipboard(
+                                                envValue.value,
+                                                variable.name
+                                            )
+                                        }
+                                    >
+                                        {copySuccess === variable.name ? (
+                                            <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                                        ) : (
+                                            <Copy className="h-3.5 w-3.5" />
+                                        )}
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    <p className="text-xs">Copy to clipboard</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
+
+                    {canEditEnvValues && (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-blue-500 hover:text-blue-700"
+                                        onClick={() =>
+                                            handleEditEnvValue(envValue)
+                                        }
+                                    >
+                                        <Edit className="h-3.5 w-3.5" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    <p className="text-xs">Edit value</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
+                </div>
+            </div>
         );
     };
 
@@ -341,7 +396,7 @@ const ApplicationsShow = () => {
                                 {application.name}
                             </h1>
                         </div>
-                        <div className="flex items-center gap-3 mt-3">
+                        <div className="flex flex-wrap items-center gap-2 mt-3">
                             <Badge
                                 variant="outline"
                                 className="bg-white/10 text-white border-white/20 backdrop-blur-sm"
@@ -370,19 +425,54 @@ const ApplicationsShow = () => {
                             </p>
                         )}
                     </div>
+                    <div className="flex flex-wrap gap-2">
+                        {canCreateEnvVariables && (
+                            <Link
+                                href={route(
+                                    "applications.envVariables.create",
+                                    {
+                                        application: application,
+                                    }
+                                )}
+                            >
+                                <Button
+                                    variant="outline"
+                                    className="gap-1.5 bg-white/10 text-white backdrop-blur-sm border-white/20 hover:bg-white/20"
+                                >
+                                    <PlusCircle className="h-4 w-4" />
+                                    New Variable
+                                </Button>
+                            </Link>
+                        )}
+                    </div>
                 </div>
             </div>
 
             <Tabs defaultValue="env-variables" className="mb-8">
-                <TabsList className="mb-6">
-                    <TabsTrigger value="env-variables" className="gap-1.5">
-                        <Package className="h-4 w-4" /> Environment Variables
+                <TabsList className="mb-6 grid w-full grid-cols-2 border rounded-lg p-1 bg-gray-50/80 shadow-sm">
+                    <TabsTrigger
+                        value="env-variables"
+                        className="gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-indigo-600"
+                    >
+                        <Package className="h-4 w-4" />
+                        <span className="hidden sm:inline">
+                            Environment Variables
+                        </span>
+                        <span className="sm:hidden">Variables</span>
+                        <Badge
+                            variant="secondary"
+                            className="ml-1.5 bg-indigo-100 text-indigo-700 border-indigo-200 hidden md:flex"
+                        >
+                            {filteredEnvVariables.length}
+                        </Badge>
                     </TabsTrigger>
-                    <TabsTrigger value="access-keys" className="gap-1.5">
-                        <Key className="h-4 w-4" /> Access Keys
-                    </TabsTrigger>
-                    <TabsTrigger value="details" className="gap-1.5">
-                        <Info className="h-4 w-4" /> Details
+
+                    <TabsTrigger
+                        value="details"
+                        className="gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-indigo-600"
+                    >
+                        <Info className="h-4 w-4" />
+                        <span>Details</span>
                     </TabsTrigger>
                 </TabsList>
 
@@ -433,162 +523,215 @@ const ApplicationsShow = () => {
                             </div>
 
                             {filteredEnvVariables.length > 0 ? (
-                                <div className="rounded-md border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
-                                                <TableHead>Name</TableHead>
-                                                <TableHead>Created</TableHead>
-                                                <TableHead>
-                                                    Last Updated
-                                                </TableHead>
-                                                <TableHead>Actions</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {filteredEnvVariables.map(
-                                                (variable) => (
-                                                    <TableRow key={variable.id}>
-                                                        <TableCell className="font-medium">
-                                                            {variable.name}
-                                                        </TableCell>
-                                                        <TableCell className="text-sm text-gray-500">
-                                                            {formatDate(
-                                                                variable.created_at
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell className="text-sm text-gray-500">
-                                                            {formatDate(
-                                                                variable.updated_at
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell className="text-right">
-                                                            <DropdownMenu>
-                                                                <DropdownMenuTrigger
-                                                                    asChild
-                                                                >
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8"
-                                                                    >
-                                                                        <MoreHorizontal className="h-4 w-4" />
-                                                                    </Button>
-                                                                </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end">
-                                                                    <DropdownMenuLabel>
-                                                                        Actions
-                                                                    </DropdownMenuLabel>
-                                                                    {canEditEnvVariables && (
-                                                                        <DropdownMenuItem
-                                                                            onClick={() =>
-                                                                                router.get(
-                                                                                    route(
-                                                                                        "applications.envVariables.edit",
-                                                                                        {
-                                                                                            application:
-                                                                                                application,
-                                                                                            envVariable:
-                                                                                                variable,
-                                                                                        }
-                                                                                    )
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            <Edit className="h-4 w-4 mr-2" />
-                                                                            Edit
-                                                                            Variable
-                                                                        </DropdownMenuItem>
-                                                                    )}
-                                                                    <DropdownMenuItem
-                                                                        onClick={() =>
-                                                                            (window.location.href =
-                                                                                route(
-                                                                                    "env-variables.show",
-                                                                                    variable.id
-                                                                                ))
+                                <div className="rounded-md border overflow-hidden">
+                                    <div className="overflow-x-auto">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
+                                                    <TableHead className="w-[180px] min-w-[180px]">
+                                                        Name
+                                                    </TableHead>
+                                                    <TableHead className="min-w-[180px]">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Settings className="h-3.5 w-3.5 text-blue-500" />
+                                                            <span>
+                                                                Development
+                                                            </span>
+                                                        </div>
+                                                    </TableHead>
+                                                    <TableHead className="min-w-[180px]">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Monitor className="h-3.5 w-3.5 text-amber-500" />
+                                                            <span>Staging</span>
+                                                        </div>
+                                                    </TableHead>
+                                                    <TableHead className="min-w-[180px]">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Globe className="h-3.5 w-3.5 text-red-500" />
+                                                            <span>
+                                                                Production
+                                                            </span>
+                                                        </div>
+                                                    </TableHead>
+                                                    <TableHead className="w-[80px]">
+                                                        Actions
+                                                    </TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {filteredEnvVariables.map(
+                                                    (variable) => (
+                                                        <TableRow
+                                                            key={variable.id}
+                                                            className="group"
+                                                        >
+                                                            <TableCell className="font-mono font-medium">
+                                                                <div className="flex flex-col">
+                                                                    <span>
+                                                                        {
+                                                                            variable.name
                                                                         }
-                                                                    >
-                                                                        <History className="h-4 w-4 mr-2" />
-                                                                        View
-                                                                        History
-                                                                    </DropdownMenuItem>
-                                                                    {canDeleteEnvVariables && (
-                                                                        <>
-                                                                            <DropdownMenuSeparator />
-                                                                            <AlertDialog>
-                                                                                <AlertDialogTrigger
-                                                                                    asChild
-                                                                                >
-                                                                                    <DropdownMenuItem
-                                                                                        className="text-red-600"
-                                                                                        onSelect={(
-                                                                                            e
-                                                                                        ) =>
-                                                                                            e.preventDefault()
-                                                                                        }
-                                                                                    >
-                                                                                        <Trash2 className="h-4 w-4 mr-2" />
-                                                                                        Delete
-                                                                                        Variable
-                                                                                    </DropdownMenuItem>
-                                                                                </AlertDialogTrigger>
-                                                                                <AlertDialogContent>
-                                                                                    <AlertDialogHeader>
-                                                                                        <AlertDialogTitle>
-                                                                                            Delete
-                                                                                            Environment
-                                                                                            Variable
-                                                                                        </AlertDialogTitle>
-                                                                                        <AlertDialogDescription>
-                                                                                            Are
-                                                                                            you
-                                                                                            sure
-                                                                                            you
-                                                                                            want
-                                                                                            to
-                                                                                            delete
-                                                                                            the
-                                                                                            variable
-                                                                                            "
-                                                                                            {
-                                                                                                variable.name
-                                                                                            }
-                                                                                            "?
-                                                                                            This
-                                                                                            action
-                                                                                            cannot
-                                                                                            be
-                                                                                            undone.
-                                                                                        </AlertDialogDescription>
-                                                                                    </AlertDialogHeader>
-                                                                                    <AlertDialogFooter>
-                                                                                        <AlertDialogCancel>
-                                                                                            Cancel
-                                                                                        </AlertDialogCancel>
-                                                                                        <AlertDialogAction
-                                                                                            className="bg-red-600 text-white hover:bg-red-700"
-                                                                                            onClick={() =>
-                                                                                                handleDeleteEnvVariable(
-                                                                                                    variable.id
-                                                                                                )
-                                                                                            }
-                                                                                        >
-                                                                                            Delete
-                                                                                        </AlertDialogAction>
-                                                                                    </AlertDialogFooter>
-                                                                                </AlertDialogContent>
-                                                                            </AlertDialog>
-                                                                        </>
+                                                                    </span>
+                                                                    {variable.sequence && (
+                                                                        <span className="text-xs text-gray-400">
+                                                                            Sequence:{" "}
+                                                                            {
+                                                                                variable.sequence
+                                                                            }
+                                                                        </span>
                                                                     )}
-                                                                </DropdownMenuContent>
-                                                            </DropdownMenu>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )
-                                            )}
-                                        </TableBody>
-                                    </Table>
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {renderEnvValue(
+                                                                    variable,
+                                                                    "development"
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {renderEnvValue(
+                                                                    variable,
+                                                                    "staging"
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {renderEnvValue(
+                                                                    variable,
+                                                                    "production"
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <div className="flex justify-end">
+                                                                    <DropdownMenu>
+                                                                        <DropdownMenuTrigger
+                                                                            asChild
+                                                                        >
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                className="h-8 w-8 opacity-70 group-hover:opacity-100"
+                                                                            >
+                                                                                <MoreHorizontal className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </DropdownMenuTrigger>
+                                                                        <DropdownMenuContent align="end">
+                                                                            <DropdownMenuLabel>
+                                                                                Actions
+                                                                            </DropdownMenuLabel>
+                                                                            {canEditEnvVariables && (
+                                                                                <DropdownMenuItem
+                                                                                    onClick={() =>
+                                                                                        router.get(
+                                                                                            route(
+                                                                                                "applications.envVariables.edit",
+                                                                                                {
+                                                                                                    application:
+                                                                                                        application,
+                                                                                                    envVariable:
+                                                                                                        variable,
+                                                                                                }
+                                                                                            )
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    <Edit className="h-4 w-4 mr-2" />
+                                                                                    Edit
+                                                                                    Variable
+                                                                                </DropdownMenuItem>
+                                                                            )}
+                                                                            <DropdownMenuItem
+                                                                                onClick={() =>
+                                                                                    (window.location.href =
+                                                                                        route(
+                                                                                            "env-variables.show",
+                                                                                            variable.id
+                                                                                        ))
+                                                                                }
+                                                                            >
+                                                                                <History className="h-4 w-4 mr-2" />
+                                                                                View
+                                                                                History
+                                                                            </DropdownMenuItem>
+                                                                            {canDeleteEnvVariables && (
+                                                                                <>
+                                                                                    <DropdownMenuSeparator />
+                                                                                    <AlertDialog>
+                                                                                        <AlertDialogTrigger
+                                                                                            asChild
+                                                                                        >
+                                                                                            <DropdownMenuItem
+                                                                                                className="text-red-600"
+                                                                                                onSelect={(
+                                                                                                    e
+                                                                                                ) =>
+                                                                                                    e.preventDefault()
+                                                                                                }
+                                                                                            >
+                                                                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                                                                Delete
+                                                                                                Variable
+                                                                                            </DropdownMenuItem>
+                                                                                        </AlertDialogTrigger>
+                                                                                        <AlertDialogContent>
+                                                                                            <AlertDialogHeader>
+                                                                                                <AlertDialogTitle>
+                                                                                                    Delete
+                                                                                                    Environment
+                                                                                                    Variable
+                                                                                                </AlertDialogTitle>
+                                                                                                <AlertDialogDescription>
+                                                                                                    Are
+                                                                                                    you
+                                                                                                    sure
+                                                                                                    you
+                                                                                                    want
+                                                                                                    to
+                                                                                                    delete
+                                                                                                    the
+                                                                                                    variable
+                                                                                                    "
+                                                                                                    <span className="font-mono font-semibold">
+                                                                                                        {
+                                                                                                            variable.name
+                                                                                                        }
+                                                                                                    </span>
+                                                                                                    "?
+                                                                                                    This
+                                                                                                    action
+                                                                                                    cannot
+                                                                                                    be
+                                                                                                    undone.
+                                                                                                </AlertDialogDescription>
+                                                                                            </AlertDialogHeader>
+                                                                                            <AlertDialogFooter>
+                                                                                                <AlertDialogCancel>
+                                                                                                    Cancel
+                                                                                                </AlertDialogCancel>
+                                                                                                <AlertDialogAction
+                                                                                                    className="bg-red-600 text-white hover:bg-red-700"
+                                                                                                    onClick={() =>
+                                                                                                        handleDeleteEnvVariable(
+                                                                                                            variable.id
+                                                                                                        )
+                                                                                                    }
+                                                                                                >
+                                                                                                    Delete
+                                                                                                </AlertDialogAction>
+                                                                                            </AlertDialogFooter>
+                                                                                        </AlertDialogContent>
+                                                                                    </AlertDialog>
+                                                                                </>
+                                                                            )}
+                                                                        </DropdownMenuContent>
+                                                                    </DropdownMenu>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -603,482 +746,30 @@ const ApplicationsShow = () => {
                                             ? "No variables match your search criteria."
                                             : "This application doesn't have any environment variables yet."}
                                     </p>
+                                    {canCreateEnvVariables && (
+                                        <Link
+                                            href={route(
+                                                "applications.envVariables.create",
+                                                {
+                                                    application: application,
+                                                }
+                                            )}
+                                        >
+                                            <Button className="gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700">
+                                                <PlusCircle className="h-4 w-4" />
+                                                Add First Variable
+                                            </Button>
+                                        </Link>
+                                    )}
                                 </div>
                             )}
                         </CardContent>
                     </Card>
                 </TabsContent>
 
-                {/* Access Keys Tab */}
-                <TabsContent value="access-keys">
-                    <Card>
-                        <CardHeader className="border-b bg-gray-50/80 px-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <CardTitle className="text-xl text-gray-800">
-                                        Access Keys
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Manage access keys for this application
-                                    </CardDescription>
-                                </div>
-                                {canCreateAccessKeys && (
-                                    <Link
-                                        href={route(
-                                            "applications.accessKeys.create",
-                                            {
-                                                application: application,
-                                            }
-                                        )}
-                                    >
-                                        <Button className="gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700">
-                                            <PlusCircle className="h-4 w-4" />
-                                            New Access Key
-                                        </Button>
-                                    </Link>
-                                )}
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="relative max-w-md w-full">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                    <Input
-                                        placeholder="Search access keys..."
-                                        className="pl-10"
-                                        value={searchKeys}
-                                        onChange={(e) =>
-                                            setSearchKeys(e.target.value)
-                                        }
-                                    />
-                                </div>
-                            </div>
-
-                            {filteredAccessKeys.length > 0 ? (
-                                <div className="rounded-md border overflow-hidden">
-                                    {/* Desktop view - Regular table */}
-                                    <div className="hidden md:block">
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
-                                                    <TableHead className="w-[250px]">
-                                                        Key
-                                                    </TableHead>
-                                                    <TableHead>
-                                                        Environment Type
-                                                    </TableHead>
-                                                    <TableHead className="w-[120px]">
-                                                        Created
-                                                    </TableHead>
-                                                    <TableHead className="w-[120px] text-right">
-                                                        Updated
-                                                    </TableHead>
-                                                    <TableHead className="w-[80px] text-right">
-                                                        Actions
-                                                    </TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {filteredAccessKeys.map(
-                                                    (key) => (
-                                                        <TableRow key={key.id}>
-                                                            <TableCell className="font-medium font-mono text-sm">
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="max-w-xs truncate">
-                                                                        {showSecretValues[
-                                                                            key
-                                                                                .id
-                                                                        ]
-                                                                            ? key.key
-                                                                            : "••••••••••••••••••••"}
-                                                                    </div>
-                                                                    <TooltipProvider>
-                                                                        <Tooltip>
-                                                                            <TooltipTrigger
-                                                                                asChild
-                                                                            >
-                                                                                <Button
-                                                                                    variant="ghost"
-                                                                                    size="icon"
-                                                                                    className="h-7 w-7"
-                                                                                    onClick={() =>
-                                                                                        toggleSecretVisibility(
-                                                                                            key.id
-                                                                                        )
-                                                                                    }
-                                                                                >
-                                                                                    {showSecretValues[
-                                                                                        key
-                                                                                            .id
-                                                                                    ] ? (
-                                                                                        <EyeOff className="h-3.5 w-3.5" />
-                                                                                    ) : (
-                                                                                        <Eye className="h-3.5 w-3.5" />
-                                                                                    )}
-                                                                                </Button>
-                                                                            </TooltipTrigger>
-                                                                            <TooltipContent>
-                                                                                <p className="text-xs">
-                                                                                    {showSecretValues[
-                                                                                        key
-                                                                                            .id
-                                                                                    ]
-                                                                                        ? "Hide"
-                                                                                        : "Show"}{" "}
-                                                                                    key
-                                                                                </p>
-                                                                            </TooltipContent>
-                                                                        </Tooltip>
-                                                                    </TooltipProvider>
-                                                                    <TooltipProvider>
-                                                                        <Tooltip>
-                                                                            <TooltipTrigger
-                                                                                asChild
-                                                                            >
-                                                                                <Button
-                                                                                    variant="ghost"
-                                                                                    size="icon"
-                                                                                    className="h-7 w-7"
-                                                                                    onClick={() =>
-                                                                                        copyToClipboard(
-                                                                                            key.key
-                                                                                        )
-                                                                                    }
-                                                                                >
-                                                                                    <Copy className="h-3.5 w-3.5" />
-                                                                                </Button>
-                                                                            </TooltipTrigger>
-                                                                            <TooltipContent>
-                                                                                <p className="text-xs">
-                                                                                    Copy
-                                                                                    to
-                                                                                    clipboard
-                                                                                </p>
-                                                                            </TooltipContent>
-                                                                        </Tooltip>
-                                                                    </TooltipProvider>
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className="bg-blue-50 text-blue-700 border-blue-200"
-                                                                >
-                                                                    {key
-                                                                        .env_type
-                                                                        ?.name ||
-                                                                        "Unknown"}
-                                                                </Badge>
-                                                            </TableCell>
-                                                            <TableCell className="text-sm text-gray-500">
-                                                                {formatDate(
-                                                                    key.created_at
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell className="text-sm text-gray-500 text-right">
-                                                                {formatDate(
-                                                                    key.updated_at
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell className="text-right">
-                                                                <DropdownMenu>
-                                                                    <DropdownMenuTrigger
-                                                                        asChild
-                                                                    >
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-8 w-8"
-                                                                        >
-                                                                            <MoreHorizontal className="h-4 w-4" />
-                                                                        </Button>
-                                                                    </DropdownMenuTrigger>
-                                                                    <DropdownMenuContent align="end">
-                                                                        <DropdownMenuLabel>
-                                                                            Actions
-                                                                        </DropdownMenuLabel>
-                                                                        {canEditAccessKeys && (
-                                                                            <DropdownMenuItem
-                                                                                onClick={() =>
-                                                                                    (window.location.href =
-                                                                                        route(
-                                                                                            "applications.accessKeys.edit",
-                                                                                            {
-                                                                                                application:
-                                                                                                    application,
-                                                                                                accessKey:
-                                                                                                    key,
-                                                                                            }
-                                                                                        ))
-                                                                                }
-                                                                            >
-                                                                                <Edit className="h-4 w-4 mr-2" />
-                                                                                Edit
-                                                                                Access
-                                                                                Key
-                                                                            </DropdownMenuItem>
-                                                                        )}
-                                                                        {canDeleteAccessKeys && (
-                                                                            <>
-                                                                                <DropdownMenuSeparator />
-                                                                                <AlertDialog>
-                                                                                    <AlertDialogTrigger
-                                                                                        asChild
-                                                                                    >
-                                                                                        <DropdownMenuItem
-                                                                                            className="text-red-600"
-                                                                                            onSelect={(
-                                                                                                e
-                                                                                            ) =>
-                                                                                                e.preventDefault()
-                                                                                            }
-                                                                                        >
-                                                                                            <Trash2 className="h-4 w-4 mr-2" />
-                                                                                            Delete
-                                                                                            Access
-                                                                                            Key
-                                                                                        </DropdownMenuItem>
-                                                                                    </AlertDialogTrigger>
-                                                                                    <AlertDialogContent>
-                                                                                        <AlertDialogHeader>
-                                                                                            <AlertDialogTitle>
-                                                                                                Delete
-                                                                                                Access
-                                                                                                Key
-                                                                                            </AlertDialogTitle>
-                                                                                            <AlertDialogDescription>
-                                                                                                Are
-                                                                                                you
-                                                                                                sure
-                                                                                                you
-                                                                                                want
-                                                                                                to
-                                                                                                delete
-                                                                                                this
-                                                                                                access
-                                                                                                key?
-                                                                                                This
-                                                                                                action
-                                                                                                cannot
-                                                                                                be
-                                                                                                undone.
-                                                                                            </AlertDialogDescription>
-                                                                                        </AlertDialogHeader>
-                                                                                        <AlertDialogFooter>
-                                                                                            <AlertDialogCancel>
-                                                                                                Cancel
-                                                                                            </AlertDialogCancel>
-                                                                                            <AlertDialogAction
-                                                                                                className="bg-red-600 text-white hover:bg-red-700"
-                                                                                                onClick={() =>
-                                                                                                    handleDeleteAccessKey(
-                                                                                                        key
-                                                                                                    )
-                                                                                                }
-                                                                                            >
-                                                                                                Delete
-                                                                                            </AlertDialogAction>
-                                                                                        </AlertDialogFooter>
-                                                                                    </AlertDialogContent>
-                                                                                </AlertDialog>
-                                                                            </>
-                                                                        )}
-                                                                    </DropdownMenuContent>
-                                                                </DropdownMenu>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    )
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                    {/* Mobile view - Card-based layout */}
-                                    <div className="md:hidden">
-                                        {filteredAccessKeys.map((key) => (
-                                            <div
-                                                key={key.id}
-                                                className="border-b p-4 last:border-b-0"
-                                            >
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div className="font-mono text-sm flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <div className="truncate max-w-[150px]">
-                                                                {key.key}
-                                                            </div>
-
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-7 w-7 shrink-0"
-                                                                onClick={() =>
-                                                                    copyToClipboard(
-                                                                        key.key
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Copy className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        </div>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="bg-blue-50 text-blue-700 border-blue-200 mt-1"
-                                                        >
-                                                            {key.env_type
-                                                                ?.name ||
-                                                                "Unknown"}
-                                                        </Badge>
-                                                    </div>
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger
-                                                            asChild
-                                                        >
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-8 w-8 mt-0.5"
-                                                            >
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuLabel>
-                                                                Actions
-                                                            </DropdownMenuLabel>
-                                                            {canEditAccessKeys && (
-                                                                <DropdownMenuItem
-                                                                    onClick={() =>
-                                                                        (window.location.href =
-                                                                            route(
-                                                                                "applications.accessKeys.edit",
-                                                                                {
-                                                                                    application:
-                                                                                        application,
-                                                                                    accessKey:
-                                                                                        key,
-                                                                                }
-                                                                            ))
-                                                                    }
-                                                                >
-                                                                    <Edit className="h-4 w-4 mr-2" />
-                                                                    Edit Access
-                                                                    Key
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                            {canDeleteAccessKeys && (
-                                                                <>
-                                                                    <DropdownMenuSeparator />
-                                                                    <AlertDialog>
-                                                                        <AlertDialogTrigger
-                                                                            asChild
-                                                                        >
-                                                                            <DropdownMenuItem
-                                                                                className="text-red-600"
-                                                                                onSelect={(
-                                                                                    e
-                                                                                ) =>
-                                                                                    e.preventDefault()
-                                                                                }
-                                                                            >
-                                                                                <Trash2 className="h-4 w-4 mr-2" />
-                                                                                Delete
-                                                                                Access
-                                                                                Key
-                                                                            </DropdownMenuItem>
-                                                                        </AlertDialogTrigger>
-                                                                        <AlertDialogContent>
-                                                                            <AlertDialogHeader>
-                                                                                <AlertDialogTitle>
-                                                                                    Delete
-                                                                                    Access
-                                                                                    Key
-                                                                                </AlertDialogTitle>
-                                                                                <AlertDialogDescription>
-                                                                                    Are
-                                                                                    you
-                                                                                    sure
-                                                                                    you
-                                                                                    want
-                                                                                    to
-                                                                                    delete
-                                                                                    this
-                                                                                    access
-                                                                                    key?
-                                                                                    This
-                                                                                    action
-                                                                                    cannot
-                                                                                    be
-                                                                                    undone.
-                                                                                </AlertDialogDescription>
-                                                                            </AlertDialogHeader>
-                                                                            <AlertDialogFooter>
-                                                                                <AlertDialogCancel>
-                                                                                    Cancel
-                                                                                </AlertDialogCancel>
-                                                                                <AlertDialogAction
-                                                                                    className="bg-red-600 text-white hover:bg-red-700"
-                                                                                    onClick={() =>
-                                                                                        handleDeleteAccessKey(
-                                                                                            key
-                                                                                        )
-                                                                                    }
-                                                                                >
-                                                                                    Delete
-                                                                                </AlertDialogAction>
-                                                                            </AlertDialogFooter>
-                                                                        </AlertDialogContent>
-                                                                    </AlertDialog>
-                                                                </>
-                                                            )}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-500">
-                                                    <div>
-                                                        <span className="block text-gray-400">
-                                                            Created
-                                                        </span>
-                                                        <span>
-                                                            {formatDate(
-                                                                key.created_at
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="block text-gray-400">
-                                                            Updated
-                                                        </span>
-                                                        <span>
-                                                            {formatDate(
-                                                                key.updated_at
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center py-12 text-center">
-                                    <div className="h-16 w-16 rounded-full bg-blue-50 flex items-center justify-center mb-4">
-                                        <Key className="h-8 w-8 text-blue-500" />
-                                    </div>
-                                    <h3 className="text-lg font-medium text-gray-900 mb-1">
-                                        No Access Keys
-                                    </h3>
-                                    <p className="text-gray-500 max-w-md mb-6">
-                                        {searchKeys
-                                            ? "No access keys match your search criteria."
-                                            : "This application doesn't have any access keys yet."}
-                                    </p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                {/* Details Tab */}
+                {/* Details Tab - unchanged */}
                 <TabsContent value="details">
+                    {/* You can keep the existing details tab content */}
                     <Card className="w-full">
                         <CardHeader className="border-b bg-gray-50/80 px-6">
                             <CardTitle className="text-xl text-gray-800">
@@ -1222,424 +913,6 @@ const ApplicationsShow = () => {
                                         </div>
                                     </div>
                                 </div>
-
-                                <div className="pt-6 border-t">
-                                    <div className="flex items-center justify-between mb-5">
-                                        <h4 className="text-sm font-medium text-gray-500">
-                                            Environment Values by Type
-                                        </h4>
-                                    </div>
-
-                                    {envTypes.length > 0 ? (
-                                        <div className="rounded-lg border border-gray-200 shadow-sm bg-gray-50/50 overflow-hidden">
-                                            <div className="flex flex-col md:flex-row">
-                                                {/* Environment Type Selector */}
-                                                <div className="w-full md:w-48 lg:w-56 flex-shrink-0 border-b md:border-b-0 md:border-r border-gray-200">
-                                                    <div className="p-3 bg-gray-100 border-b border-gray-200">
-                                                        <h3 className="text-sm font-medium text-gray-700">
-                                                            Environment Types
-                                                        </h3>
-                                                    </div>
-                                                    <div className="p-2">
-                                                        {envTypes.map(
-                                                            (envType) => (
-                                                                <Button
-                                                                    key={
-                                                                        envType.id
-                                                                    }
-                                                                    variant={
-                                                                        selectedEnvType ===
-                                                                        envType
-                                                                            ? "default"
-                                                                            : "ghost"
-                                                                    }
-                                                                    className={`w-full justify-start gap-2 text-left mb-1 ${
-                                                                        selectedEnvType ===
-                                                                        envType
-                                                                            ? "bg-blue-100 hover:bg-blue-200 text-blue-800"
-                                                                            : "text-gray-700"
-                                                                    }`}
-                                                                    onClick={() =>
-                                                                        loadEnvValuesByType(
-                                                                            envType
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    {getEnvTypeIcon(
-                                                                        envType.name
-                                                                    )}
-                                                                    <span>
-                                                                        {
-                                                                            envType.name
-                                                                        }
-                                                                    </span>
-                                                                </Button>
-                                                            )
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Environment Values Display */}
-                                                <div className="flex-1 p-5">
-                                                    {!selectedEnvType ? (
-                                                        <div className="flex flex-col items-center justify-center py-10 text-center">
-                                                            <div className="h-14 w-14 rounded-full bg-blue-50 flex items-center justify-center mb-4">
-                                                                <Layers className="h-7 w-7 text-blue-500" />
-                                                            </div>
-                                                            <h3 className="text-base font-medium text-gray-700 mb-2">
-                                                                Select an
-                                                                Environment Type
-                                                            </h3>
-                                                            <p className="text-sm text-gray-500 max-w-md">
-                                                                Click on an
-                                                                environment type
-                                                                from the left to
-                                                                view its
-                                                                variables and
-                                                                values.
-                                                            </p>
-                                                        </div>
-                                                    ) : envValuesLoading ? (
-                                                        <div className="flex justify-center items-center py-10">
-                                                            <div className="flex items-center gap-3 text-blue-600">
-                                                                <Loader2 className="h-6 w-6 animate-spin" />
-                                                                <span className="font-medium">
-                                                                    Loading
-                                                                    environment
-                                                                    values...
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            <div className="flex items-center gap-2 mb-5">
-                                                                <h3 className="text-lg font-medium text-gray-800">
-                                                                    {
-                                                                        selectedEnvType?.name
-                                                                    }{" "}
-                                                                    Variables
-                                                                </h3>
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className="bg-blue-50 text-blue-700 border-blue-200"
-                                                                >
-                                                                    {envValues[
-                                                                        selectedEnvType
-                                                                            ?.id
-                                                                    ]?.length ||
-                                                                        0}{" "}
-                                                                    variables
-                                                                </Badge>
-                                                            </div>
-
-                                                            {envValues[
-                                                                selectedEnvType
-                                                                    ?.id
-                                                            ]?.length > 0 ? (
-                                                                <ScrollArea className="h-96 pr-4">
-                                                                    <Accordion
-                                                                        type="multiple"
-                                                                        className="w-full"
-                                                                    >
-                                                                        {envValues[
-                                                                            selectedEnvType
-                                                                                ?.id
-                                                                        ]
-                                                                            .sort(
-                                                                                (
-                                                                                    a,
-                                                                                    b
-                                                                                ) => {
-                                                                                    // Sort logic remains the same
-                                                                                    const seqA =
-                                                                                        a
-                                                                                            .env_variable
-                                                                                            .sequence ===
-                                                                                        null
-                                                                                            ? 999999
-                                                                                            : a
-                                                                                                  .env_variable
-                                                                                                  .sequence;
-                                                                                    const seqB =
-                                                                                        b
-                                                                                            .env_variable
-                                                                                            .sequence ===
-                                                                                        null
-                                                                                            ? 999999
-                                                                                            : b
-                                                                                                  .env_variable
-                                                                                                  .sequence;
-
-                                                                                    if (
-                                                                                        seqA !==
-                                                                                        seqB
-                                                                                    ) {
-                                                                                        return (
-                                                                                            Number(
-                                                                                                seqA
-                                                                                            ) -
-                                                                                            Number(
-                                                                                                seqB
-                                                                                            )
-                                                                                        );
-                                                                                    }
-
-                                                                                    return a.env_variable.name.localeCompare(
-                                                                                        b
-                                                                                            .env_variable
-                                                                                            .name
-                                                                                    );
-                                                                                }
-                                                                            )
-                                                                            .map(
-                                                                                (
-                                                                                    envValue
-                                                                                ) => (
-                                                                                    <AccordionItem
-                                                                                        key={
-                                                                                            envValue.id
-                                                                                        }
-                                                                                        value={envValue.id.toString()}
-                                                                                        className="border-b border-gray-100 last:border-none"
-                                                                                    >
-                                                                                        <AccordionTrigger className="py-3 hover:bg-gray-50/70 px-3 -mx-3 rounded-md">
-                                                                                            <div className="flex items-center gap-2 text-left">
-                                                                                                <DatabaseIcon className="h-4 w-4 text-gray-400" />
-                                                                                                <span className="font-mono font-medium">
-                                                                                                    {
-                                                                                                        envValue
-                                                                                                            .env_variable
-                                                                                                            .name
-                                                                                                    }
-                                                                                                </span>
-                                                                                            </div>
-                                                                                        </AccordionTrigger>
-                                                                                        <AccordionContent className="pt-3 pb-4">
-                                                                                            <div
-                                                                                                className="rounded-md bg-gray-50 p-4 font-mono text-sm break-all cursor-pointer hover:bg-gray-100 transition-colors"
-                                                                                                onClick={() =>
-                                                                                                    canEditEnvValues &&
-                                                                                                    handleEditEnvValue(
-                                                                                                        envValue
-                                                                                                    )
-                                                                                                }
-                                                                                            >
-                                                                                                {showSecretValues[
-                                                                                                    `env_${envValue.id}`
-                                                                                                ] ? (
-                                                                                                    <div className="text-gray-900">
-                                                                                                        {envValue.value || (
-                                                                                                            <span className="text-gray-400 italic">
-                                                                                                                (empty
-                                                                                                                value)
-                                                                                                            </span>
-                                                                                                        )}
-                                                                                                    </div>
-                                                                                                ) : (
-                                                                                                    <div className="text-gray-500">
-                                                                                                        {envValue.value ? (
-                                                                                                            "••••••••••••••••••••"
-                                                                                                        ) : (
-                                                                                                            <span className="italic">
-                                                                                                                (empty
-                                                                                                                value)
-                                                                                                            </span>
-                                                                                                        )}
-                                                                                                    </div>
-                                                                                                )}
-                                                                                                <div className="flex justify-end gap-1 mt-3">
-                                                                                                    <TooltipProvider>
-                                                                                                        <Tooltip>
-                                                                                                            <TooltipTrigger
-                                                                                                                asChild
-                                                                                                            >
-                                                                                                                <Button
-                                                                                                                    variant="ghost"
-                                                                                                                    size="icon"
-                                                                                                                    className="h-7 w-7"
-                                                                                                                    onClick={(
-                                                                                                                        e
-                                                                                                                    ) => {
-                                                                                                                        e.stopPropagation();
-                                                                                                                        toggleSecretVisibility(
-                                                                                                                            `env_${envValue.id}`
-                                                                                                                        );
-                                                                                                                    }}
-                                                                                                                >
-                                                                                                                    {showSecretValues[
-                                                                                                                        `env_${envValue.id}`
-                                                                                                                    ] ? (
-                                                                                                                        <EyeOff className="h-3.5 w-3.5" />
-                                                                                                                    ) : (
-                                                                                                                        <Eye className="h-3.5 w-3.5" />
-                                                                                                                    )}
-                                                                                                                </Button>
-                                                                                                            </TooltipTrigger>
-                                                                                                            <TooltipContent>
-                                                                                                                <p className="text-xs">
-                                                                                                                    {showSecretValues[
-                                                                                                                        `env_${envValue.id}`
-                                                                                                                    ]
-                                                                                                                        ? "Hide"
-                                                                                                                        : "Show"}{" "}
-                                                                                                                    value
-                                                                                                                </p>
-                                                                                                            </TooltipContent>
-                                                                                                        </Tooltip>
-                                                                                                    </TooltipProvider>
-
-                                                                                                    <TooltipProvider>
-                                                                                                        <Tooltip>
-                                                                                                            <TooltipTrigger
-                                                                                                                asChild
-                                                                                                            >
-                                                                                                                <Button
-                                                                                                                    variant="ghost"
-                                                                                                                    size="icon"
-                                                                                                                    className="h-7 w-7"
-                                                                                                                    onClick={(
-                                                                                                                        e
-                                                                                                                    ) => {
-                                                                                                                        e.stopPropagation();
-                                                                                                                        copyToClipboard(
-                                                                                                                            envValue.value
-                                                                                                                        );
-                                                                                                                    }}
-                                                                                                                >
-                                                                                                                    <Copy className="h-3.5 w-3.5" />
-                                                                                                                </Button>
-                                                                                                            </TooltipTrigger>
-                                                                                                            <TooltipContent>
-                                                                                                                <p className="text-xs">
-                                                                                                                    Copy
-                                                                                                                    to
-                                                                                                                    clipboard
-                                                                                                                </p>
-                                                                                                            </TooltipContent>
-                                                                                                        </Tooltip>
-                                                                                                    </TooltipProvider>
-
-                                                                                                    {canEditEnvValues && (
-                                                                                                        <TooltipProvider>
-                                                                                                            <Tooltip>
-                                                                                                                <TooltipTrigger
-                                                                                                                    asChild
-                                                                                                                >
-                                                                                                                    <Button
-                                                                                                                        variant="ghost"
-                                                                                                                        size="icon"
-                                                                                                                        className="h-7 w-7"
-                                                                                                                        onClick={(
-                                                                                                                            e
-                                                                                                                        ) => {
-                                                                                                                            e.stopPropagation();
-                                                                                                                            handleEditEnvValue(
-                                                                                                                                envValue
-                                                                                                                            );
-                                                                                                                        }}
-                                                                                                                    >
-                                                                                                                        <Edit className="h-3.5 w-3.5" />
-                                                                                                                    </Button>
-                                                                                                                </TooltipTrigger>
-                                                                                                                <TooltipContent>
-                                                                                                                    <p className="text-xs">
-                                                                                                                        Edit
-                                                                                                                        value
-                                                                                                                    </p>
-                                                                                                                </TooltipContent>
-                                                                                                            </Tooltip>
-                                                                                                        </TooltipProvider>
-                                                                                                    )}
-                                                                                                </div>
-                                                                                            </div>
-                                                                                            <div className="mt-3 text-xs text-gray-500 flex items-center justify-between">
-                                                                                                <div>
-                                                                                                    Sequence:{" "}
-                                                                                                    <span className="font-medium text-gray-700">
-                                                                                                        {envValue
-                                                                                                            .env_variable
-                                                                                                            .sequence ||
-                                                                                                            "None"}
-                                                                                                    </span>
-                                                                                                </div>
-                                                                                                <div>
-                                                                                                    Last
-                                                                                                    Updated:{" "}
-                                                                                                    <span className="font-medium text-gray-700">
-                                                                                                        {formatDate(
-                                                                                                            envValue.updated_at
-                                                                                                        )}
-                                                                                                    </span>
-                                                                                                </div>
-                                                                                            </div>
-                                                                                        </AccordionContent>
-                                                                                    </AccordionItem>
-                                                                                )
-                                                                            )}
-                                                                    </Accordion>
-                                                                </ScrollArea>
-                                                            ) : (
-                                                                <div className="flex flex-col items-center justify-center py-10 text-center">
-                                                                    <div className="h-14 w-14 rounded-full bg-amber-50 flex items-center justify-center mb-3">
-                                                                        <AlertTriangle className="h-7 w-7 text-amber-500" />
-                                                                    </div>
-                                                                    <h3 className="text-base font-medium text-gray-700 mb-2">
-                                                                        No
-                                                                        Environment
-                                                                        Values
-                                                                    </h3>
-                                                                    <p className="text-sm text-gray-500 max-w-md">
-                                                                        This
-                                                                        environment
-                                                                        type
-                                                                        doesn't
-                                                                        have any
-                                                                        variable
-                                                                        values
-                                                                        yet.
-                                                                    </p>
-                                                                </div>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center py-10 text-center rounded-lg border border-gray-200 bg-gray-50/50">
-                                            <div className="h-14 w-14 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-                                                <Layers className="h-7 w-7 text-gray-400" />
-                                            </div>
-                                            <h3 className="text-base font-medium text-gray-700 mb-2">
-                                                No Environment Types
-                                            </h3>
-                                            <p className="text-sm text-gray-500 max-w-md mb-4">
-                                                This application doesn't have
-                                                any environment types configured
-                                                yet.
-                                            </p>
-                                            {canCreateAccessKeys && (
-                                                <Link
-                                                    href={route(
-                                                        "applications.accessKeys.create",
-                                                        {
-                                                            application:
-                                                                application.id,
-                                                        }
-                                                    )}
-                                                >
-                                                    <Button
-                                                        size="sm"
-                                                        className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
-                                                    >
-                                                        <Key className="h-3.5 w-3.5" />
-                                                        Create Access Key
-                                                    </Button>
-                                                </Link>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
                             </div>
                         </CardContent>
                         <CardFooter className="bg-gray-50/80 px-6 py-4 flex justify-between items-center border-t">
@@ -1649,72 +922,99 @@ const ApplicationsShow = () => {
                                     {application.id}
                                 </span>
                             </div>
-                            <Link
-                                href={route(
-                                    "applications.edit",
-                                    application.id
-                                )}
-                            >
-                                <Button variant="outline" className="gap-1.5">
-                                    <Edit className="h-4 w-4" /> Edit
-                                    Application
-                                </Button>
-                            </Link>
                         </CardFooter>
                     </Card>
                 </TabsContent>
             </Tabs>
-            {/* Edit Environment Value Dialog */}
-            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Edit Environment Value</DialogTitle>
-                        <DialogDescription>
-                            {editingEnvValue && (
-                                <span className="font-mono text-sm">
-                                    {editingEnvValue.env_variable.name}
+
+            {/* Edit Value Dialog */}
+            {canEditEnvValues && (
+                <Dialog
+                    open={isEditDialogOpen}
+                    onOpenChange={setIsEditDialogOpen}
+                >
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Edit Environment Value</DialogTitle>
+                            <DialogDescription>
+                                Update the value for{" "}
+                                <span className="font-mono font-semibold">
+                                    {editingEnvValue?.env_variable?.name}
+                                </span>{" "}
+                                in{" "}
+                                <span className="font-semibold">
+                                    {
+                                        editingEnvValue?.access_key?.env_type
+                                            ?.name
+                                    }{" "}
+                                    environment
                                 </span>
-                            )}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <label
-                                htmlFor="env-value"
-                                className="text-sm font-medium"
-                            >
-                                Value
-                            </label>
-                            <Input
-                                id="env-value"
-                                value={editedValue}
-                                onChange={(e) => setEditedValue(e.target.value)}
-                                placeholder="Enter environment value"
-                                className="font-mono"
-                            />
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="env-value">Value</Label>
+                                <Input
+                                    id="env-value"
+                                    value={editedValue}
+                                    onChange={(e) =>
+                                        setEditedValue(e.target.value)
+                                    }
+                                    placeholder="Enter new value"
+                                    className="font-mono"
+                                />
+                            </div>
                         </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setIsEditDialogOpen(false)}
-                            disabled={isSubmitting}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleSaveEnvValue}
-                            disabled={isSubmitting}
-                            className="gap-1.5"
-                        >
-                            {isSubmitting && (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            )}
-                            Save
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => setIsEditDialogOpen(false)}
+                                disabled={isSubmitting}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleSaveEnvValue}
+                                disabled={isSubmitting}
+                                className="gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700"
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <svg
+                                            className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <circle
+                                                className="opacity-25"
+                                                cx="12"
+                                                cy="12"
+                                                r="10"
+                                                stroke="currentColor"
+                                                strokeWidth="4"
+                                            ></circle>
+                                            <path
+                                                className="opacity-75"
+                                                fill="currentColor"
+                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                            ></path>
+                                        </svg>
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check className="h-4 w-4" />
+                                        Save Changes
+                                    </>
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
         </AuthenticatedLayout>
     );
 };

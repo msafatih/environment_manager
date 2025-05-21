@@ -5,9 +5,9 @@ export interface User {
     email_verified_at?: string;
     created_at: string;
     updated_at: string;
-    group: GroupMember[];
+    group_members: GroupMember[];
     env_value_changes: EnvValueChange[];
-    roles?: ModelHasRole[];
+    roles: ModelHasRole[];
     permissions?: ModelHasPermission[];
     all_permissions?: Permission[];
 }

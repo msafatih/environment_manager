@@ -29,6 +29,9 @@ class StoreEnvVariableRequest extends FormRequest
             'name' => 'required|string|max:255',
             'sequence' => 'nullable|integer',
             'application_id' => 'required|exists:applications,id',
+            'production_value' => 'nullable|string',
+            'staging_value' => 'nullable|string',
+            'development_value' => 'nullable|string',
         ];
     }
 }

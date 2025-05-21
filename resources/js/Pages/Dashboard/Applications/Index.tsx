@@ -39,7 +39,7 @@ import {
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/Components/ui/tooltip";
+} from "@/components/ui/tooltip";
 import {
     Select,
     SelectContent,
@@ -47,7 +47,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/Components/ui/select";
-import { Skeleton } from "@/Components/ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ApplicationsPageProps extends PageProps {
     applications: Application[];

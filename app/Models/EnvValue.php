@@ -20,9 +20,9 @@ class EnvValue extends Model
         'updated_at' => 'datetime',
     ];
 
-    public function envValue()
+    public function envVariable()
     {
-        return $this->belongsTo(EnvValue::class, 'env_variable_id', 'id');
+        return $this->belongsTo(EnvVariable::class, 'env_variable_id', 'id');
     }
 
     public function accessKey()
@@ -30,7 +30,7 @@ class EnvValue extends Model
         return $this->belongsTo(AccessKey::class, 'access_key_id', 'id');
     }
 
-    public function envVariableChanges()
+    public function envValueChanges()
     {
         return $this->hasMany(EnvValueChange::class, 'env_value_id', 'id');
     }

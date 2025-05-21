@@ -25,9 +25,8 @@ class UpdateGroupRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => 'required|string|max:255|unique:groups,name',
-            'description' => 'nullable|string|max:255',
-
+            'name' => 'required|string|max:255|unique:groups,name, ' . $this->group->id,
+            'description' => 'nullable|string',
         ];
     }
 }

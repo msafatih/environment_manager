@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('env_value_changes', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('env_value_id')->constrained('env_value')->onDelete('cascade');
+            $table->foreignId('env_value_id')->constrained('env_values')->onDelete('cascade');
             $table->string('old_value')->nullable();
             $table->string('new_value')->nullable();
             $table->enum('type', ['create', 'update', 'delete']);

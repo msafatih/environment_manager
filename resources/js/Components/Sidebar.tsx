@@ -6,9 +6,10 @@ import {
     Tags,
     Shield,
     Users,
-    Settings,
     Home,
     ShieldAlert as Guard,
+    ShieldAlert,
+    LogOut,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import SidebarItem from "./SidebarItem";
@@ -37,15 +38,6 @@ const Sidebar = ({ sidebarOpen, toggleSidebar }: SidebarProps) => {
             setActiveSection(null);
         }
     }, [url]);
-
-    // Toggle section expansion
-    const toggleSection = (section: string) => {
-        if (activeSection === section) {
-            setActiveSection(null);
-        } else {
-            setActiveSection(section);
-        }
-    };
 
     return (
         <aside
@@ -96,6 +88,12 @@ const Sidebar = ({ sidebarOpen, toggleSidebar }: SidebarProps) => {
                             text="Applications"
                             isActive={route().current("applications.*")}
                         />
+                        <SidebarItem
+                            href="envValueChanges.index"
+                            icon={ShieldAlert}
+                            text="Environment Value Changes"
+                            isActive={route().current("envValueChanges.*")}
+                        />
                     </SidebarSection>
 
                     <SidebarSection title="Access Management">
@@ -118,29 +116,18 @@ const Sidebar = ({ sidebarOpen, toggleSidebar }: SidebarProps) => {
                             isActive={route().current("permissions.*")}
                         />
                     </SidebarSection>
-
-                    {/* Settings Section */}
-                    {/* <SidebarSection title="General">
-                        <SidebarItem
-                            href="settings.index"
-                            icon={Settings}
-                            text="Settings"
-                            isActive={route().current("settings.*")}
-                        />
-                    </SidebarSection> */}
                 </nav>
 
-                {/* Footer Section */}
                 <div className="mt-auto border-t border-indigo-800/70 p-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                            <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-md shadow-emerald-400/40 animate-pulse"></div>
-                            <span className="text-sm text-indigo-100">
-                                All systems online
-                            </span>
-                        </div>
-                        <span className="text-xs text-indigo-400">v1.2.0</span>
-                    </div>
+                    <Link
+                        href={route("logout")}
+                        method="post"
+                        as="button"
+                        className="flex w-full items-center justify-center gap-2 rounded-md bg-indigo-800/30 py-2.5 text-sm font-medium text-indigo-100 transition-all hover:bg-indigo-700/50 hover:text-white active:bg-indigo-800"
+                    >
+                        <LogOut className="h-4 w-4" />
+                        <span>Logout</span>
+                    </Link>
                 </div>
             </div>
         </aside>
