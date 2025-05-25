@@ -18,11 +18,12 @@
     -   [6. Database Configuration](#6-database-configuration)
     -   [7. Run Migrations and Seeders](#7-run-migrations-and-seeders)
     -   [8. Start Development Servers](#8-start-development-servers)
--   [Project Structure](#project-structure)
 -   [Key Features](#key-features)
 -   [Common Issues and Troubleshooting](#common-issues-and-troubleshooting)
 -   [Contributing](#contributing)
 -   [License](#license)
+-   [Additional Resources](#additional-resources)
+-   [Conclusion](#conclusion)
 
 ---
 
@@ -44,7 +45,7 @@ Before you begin, ensure you have the following installed:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/environment-manager.git
+git clone https://github.com/Biyuraaa/environment_manager.git
 cd environment-manager
 ```
 
