@@ -1,6 +1,7 @@
-import Footer from "@/Components/Footer";
-import Navbar from "@/Components/Navbar";
+"use client";
+
 import { PropsWithChildren, useEffect, useState } from "react";
+import { ArrowUp } from "lucide-react";
 
 const GuestLayout = ({ children }: PropsWithChildren) => {
     const [scrollPosition, setScrollPosition] = useState(0);
@@ -13,21 +14,15 @@ const GuestLayout = ({ children }: PropsWithChildren) => {
         };
 
         window.addEventListener("scroll", handleScroll);
-
-        return () => {
-            window.removeEventListener("scroll", handleScroll);
-        };
+        return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
     // Add page load animation
     useEffect(() => {
         setPageLoaded(true);
-
-        // Optional: You can add scroll restoration here
         window.scrollTo(0, 0);
     }, []);
 
-    // Scroll to top button visibility
     const showScrollTop = scrollPosition > 300;
 
     const scrollToTop = () => {
@@ -40,47 +35,51 @@ const GuestLayout = ({ children }: PropsWithChildren) => {
     return (
         <div
             className={`
-            flex min-h-screen flex-col bg-white  
-            transition-colors duration-300 overflow-hidden
-            ${pageLoaded ? "opacity-100" : "opacity-0"}
-        `}
+                flex min-h-screen flex-col bg-gradient-to-br from-slate-50 via-white to-slate-100
+                transition-all duration-500 overflow-hidden relative
+                ${pageLoaded ? "opacity-100" : "opacity-0"}
+            `}
         >
             {/* Skip to content link for accessibility */}
             <a
                 href="#main-content"
-                className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:px-4 focus:py-2 focus:bg-indigo-600 focus:text-white"
+                className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-md focus:m-4"
             >
                 Skip to content
             </a>
 
-            {/* Fixed Background Elements (optional decorative elements) */}
-            <div className="fixed inset-0 pointer-events-none z-0">
-                <div className="absolute -top-24 -right-24 w-96 h-96 bg-indigo-100 dark:bg-indigo-900/20 rounded-full blur-3xl opacity-30"></div>
-                <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-100 dark:bg-blue-900/20 rounded-full blur-3xl opacity-30"></div>
-            </div>
+            {/* Animated Background Elements */}
+            <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+                {/* Primary gradient orbs */}
+                <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/30 to-purple-500/30 rounded-full blur-3xl animate-pulse"></div>
+                <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-emerald-400/30 to-blue-500/30 rounded-full blur-3xl animate-pulse delay-1000"></div>
 
-            {/* Navbar */}
-            <Navbar />
+                {/* Secondary floating elements */}
+                <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-gradient-to-r from-pink-300/20 to-yellow-300/20 rounded-full blur-2xl animate-bounce delay-500"></div>
+                <div className="absolute bottom-1/4 right-1/4 w-24 h-24 bg-gradient-to-l from-indigo-300/20 to-purple-300/20 rounded-full blur-xl animate-bounce delay-700"></div>
+
+                {/* Geometric patterns */}
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                    <div className="w-96 h-96 border border-white/10 rounded-full animate-spin-slow"></div>
+                    <div className="absolute inset-8 border border-white/5 rounded-full animate-spin-reverse"></div>
+                </div>
+            </div>
 
             {/* Main Content */}
             <main
                 id="main-content"
-                className={`
-                    flex-grow container mx-auto pt-8 md:pt-12 
-                    relative z-10 transition-all duration-500 ease-in-out
-                    ${scrollPosition > 50 ? "pt-24" : "pt-20"}
-                `}
+                className="flex-grow relative z-10 transition-all duration-500 ease-in-out"
             >
                 {/* Page transition wrapper */}
                 <div
                     className={`
-                    transition-opacity duration-500 ease-in-out
-                    ${
-                        pageLoaded
-                            ? "opacity-100 translate-y-0"
-                            : "opacity-0 translate-y-4"
-                    }
-                `}
+                        transition-all duration-700 ease-out
+                        ${
+                            pageLoaded
+                                ? "opacity-100 translate-y-0 scale-100"
+                                : "opacity-0 translate-y-8 scale-95"
+                        }
+                    `}
                 >
                     {children}
                 </div>
@@ -90,31 +89,21 @@ const GuestLayout = ({ children }: PropsWithChildren) => {
             <button
                 onClick={scrollToTop}
                 className={`
-                    fixed bottom-6 right-6 p-3 rounded-full bg-indigo-600 text-white 
-                    shadow-lg hover:bg-indigo-700 transition-all duration-300 z-40
+                    fixed bottom-8 right-8 p-4 rounded-full 
+                    bg-gradient-to-r from-blue-600 to-purple-600 text-white 
+                    shadow-2xl hover:shadow-blue-500/25 hover:scale-110
+                    transition-all duration-300 z-50 backdrop-blur-sm
+                    border border-white/20
                     ${
                         showScrollTop
-                            ? "opacity-100 scale-100"
-                            : "opacity-0 scale-90 pointer-events-none"
+                            ? "opacity-100 scale-100 translate-y-0"
+                            : "opacity-0 scale-90 translate-y-4 pointer-events-none"
                     }
                 `}
                 aria-label="Scroll to top"
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                >
-                    <path
-                        fillRule="evenodd"
-                        d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"
-                        clipRule="evenodd"
-                    />
-                </svg>
+                <ArrowUp className="h-5 w-5" />
             </button>
-
-            <Footer />
         </div>
     );
 };
