@@ -3,11 +3,10 @@
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\GroupController;
 use App\Http\Controllers\PermissionController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\EnvValueChangeController;
-use Illuminate\Foundation\Application;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -59,10 +58,16 @@ Route::prefix('dashboard')->group(function () {
 })->middleware(['auth', 'verified']);
 
 
+Route::middleware('guest')->group(function () {
+    Route::get('login', [AuthenticatedSessionController::class, 'create'])
+        ->name('login');
+
+    Route::post('login', [AuthenticatedSessionController::class, 'store']);
+});
+
 Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
+        ->name('logout');
 });
 
 require __DIR__ . '/auth.php';

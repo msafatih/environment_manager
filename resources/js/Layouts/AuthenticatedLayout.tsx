@@ -6,7 +6,6 @@ import Sidebar from "@/Components/Sidebar";
 
 interface AuthenticatedLayoutProps {
     children: React.ReactNode;
-    header?: ReactNode;
     fluid?: boolean;
 }
 
