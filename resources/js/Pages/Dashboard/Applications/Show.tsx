@@ -34,6 +34,7 @@ import {
     CheckCircle,
     AlertTriangle,
     Check,
+    ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/Components/ui/button";
 import {
@@ -426,24 +427,15 @@ const ApplicationsShow = () => {
                         )}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {canCreateEnvVariables && (
-                            <Link
-                                href={route(
-                                    "applications.envVariables.create",
-                                    {
-                                        application: application,
-                                    }
-                                )}
+                        <Link href={route("applications.index")}>
+                            <Button
+                                variant="outline"
+                                className="gap-1.5 bg-white/10 text-white backdrop-blur-sm border-white/20 hover:bg-white/20"
                             >
-                                <Button
-                                    variant="outline"
-                                    className="gap-1.5 bg-white/10 text-white backdrop-blur-sm border-white/20 hover:bg-white/20"
-                                >
-                                    <PlusCircle className="h-4 w-4" />
-                                    New Variable
-                                </Button>
-                            </Link>
-                        )}
+                                <ArrowLeft className="h-4 w-4" />
+                                Kembali
+                            </Button>
+                        </Link>
                     </div>
                 </div>
             </div>

@@ -86,6 +86,7 @@ export interface Application {
     id: string;
     name: string;
     description: string;
+    health : number;
     created_at: string;
     updated_at: string;
     group: Group;

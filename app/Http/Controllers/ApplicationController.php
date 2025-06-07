@@ -32,20 +32,21 @@ class ApplicationController extends Controller
      */
     public function index()
     {
-        //
-
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
+        // Load applications with related data
         $applications = Application::with(['group', 'envVariables', 'accessKeys'])->get();
+
         $groupCount = Group::count();
+
 
         return Inertia::render('Dashboard/Applications/Index', [
             'applications' => $applications,
             'groupCount' => $groupCount,
             'canCreateApplication' => $user->can('create-applications'),
             'canEditApplication' => $user->can('edit-applications'),
-            'canDeleteApplication' => $user->can('delete-applications'),
+            'canDeleteApplication' => $user->can('delete-applications'), // This is the general permission check
             'canViewApplication' => $user->can('view-applications'),
         ]);
     }
@@ -126,7 +127,6 @@ class ApplicationController extends Controller
             'accessKeys.envType',
         ]);
 
-
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
@@ -196,6 +196,15 @@ class ApplicationController extends Controller
         //
         $this->authorize('delete-applications');
         try {
+            if ($application->health > 0) {
+                return redirect()->back()->with(
+                    'error',
+                    'Cannot delete application because it contains filled environment variables. ' .
+                        'Current health: ' . $application->health . '/' . $application->health .
+                        '. Please empty all environment variable values before deleting.'
+                );
+            }
+
             $application->delete();
             return redirect()->route('applications.index')->with('success', 'Application deleted successfully!');
         } catch (\Exception $e) {
@@ -255,24 +264,35 @@ class ApplicationController extends Controller
                 ]);
 
                 // Record the change
-                EnvValueChange::create([
+                $envValueChange = EnvValueChange::create([
                     'env_value_id' => $envValue->id,
                     'user_id' => Auth::id(),
                     'old_value' => null,
                     'new_value' => $value ?: null,
                     'type' => 'create',
                 ]);
-            }
 
-            // Commit the transaction
-            DB::commit();
-
-            if ($request->wantsJson()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Env variable created successfully!'
+                Log::info('Env value created successfully', [
+                    'application_id' => $application->id,
+                    'env_variable_id' => $envVariable->id,
+                    'access_key_id' => $accessKey->id,
+                    'env_value_id' => $envValue->id,
+                    'env_value_change_id' => $envValueChange->id,
+                    'user_id' => Auth::id(),
                 ]);
             }
+
+            $application->updateHealth();
+
+            Log::info('Env variable created successfully', [
+                'application_id' => $application->id,
+                'env_variable_id' => $envVariable->id,
+                'user_id' => Auth::id(),
+            ]);
+
+            DB::commit();
+
+
 
             return redirect()->route('applications.show', $application)
                 ->with('success', 'Env variable created successfully!');
@@ -285,13 +305,6 @@ class ApplicationController extends Controller
                 'user_id' => Auth::id(),
                 'trace' => $e->getTraceAsString(),
             ]);
-
-            if ($request->wantsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to create env variable: ' . $e->getMessage()
-                ], 500);
-            }
 
             return redirect()->back()->with('error', 'Failed to create env variable: ' . $e->getMessage());
         }
@@ -322,12 +335,6 @@ class ApplicationController extends Controller
             ]);
 
             $accessKeys = $application->accessKeys;
-
-            $envTypeMap = [
-                'production_value' => 'Production',
-                'staging_value' => 'Staging',
-                'development_value' => 'Development',
-            ];
 
             foreach ($accessKeys as $accessKey) {
                 $envTypeName = $accessKey->envType->name ?? null;
@@ -367,6 +374,8 @@ class ApplicationController extends Controller
                     ]);
                 }
             }
+
+            $application->updateHealth();
 
             // Commit the transaction
             DB::commit();
@@ -436,9 +445,8 @@ class ApplicationController extends Controller
         $envValue->update([
             'value' => $validated['value'],
         ]);
-
-        // Log the change
-
+        // Update the health of the application
+        $application->updateHealth();
 
         return Redirect::back()->with('success', 'Env value updated successfully!');
     }

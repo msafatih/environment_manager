@@ -15,9 +15,42 @@ class Application extends Model
     protected $fillable = [
         'name',
         'description',
+        'health',
         'slug',
         'group_id',
     ];
+
+    public function updateHealth()
+    {
+        $envVariables = $this->envVariables()->get();
+
+        $accessKeys = $this->accessKeys()->get();
+
+        if ($envVariables->count() === 0) {
+            $this->health = 0.00;
+            $this->save();
+            return 0;
+        }
+
+        $totalPossible = $envVariables->count() * $accessKeys->count();
+
+        $filledValues = EnvValue::whereHas('envVariable', function ($query) {
+            $query->where('application_id', $this->id);
+        })
+            ->whereNotNull('value')
+            ->where('value', '!=', '')
+            ->count();
+
+        $healthPercentage = $totalPossible > 0
+            ? round(($filledValues / $totalPossible) * 100, 2)
+            : 0;
+
+        $this->health = $healthPercentage;
+        $this->save();
+
+        return $healthPercentage;
+    }
+
 
     protected $casts = [
         'created_at' => 'datetime',

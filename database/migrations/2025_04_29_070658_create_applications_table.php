@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('name')->unique();
             $table->string('description')->nullable();
             $table->string('slug')->unique();
+            $table->decimal('health', 5, 2)->default(0.00);
             $table->foreignId('group_id')->constrained('groups')->onDelete('cascade');
             $table->timestamps();
             $table->softDeletes();

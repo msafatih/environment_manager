@@ -8,20 +8,13 @@ import {
     Search,
     Plus,
     ArrowUpDown,
-    MoreHorizontal,
     Eye,
     Edit,
     Trash,
-    Calendar,
-    Clock,
-    Database,
-    Key,
     Code,
     ChevronLeft,
     ChevronRight,
     FolderTree,
-    ArrowUp,
-    ArrowDown,
 } from "lucide-react";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
@@ -48,6 +41,14 @@ import {
     SelectValue,
 } from "@/Components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/Components/ui/dialog";
 
 interface ApplicationsPageProps extends PageProps {
     applications: Application[];
@@ -73,9 +74,33 @@ const ApplicationsIndex = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [sortField, setSortField] = useState<"name" | "created_at">("name");
     const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-    const [viewType, setViewType] = useState<"table" | "grid">("table");
     const [isLoading, setIsLoading] = useState(false);
     const [groupFilter, setGroupFilter] = useState<number | "all">("all");
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [applicationToDelete, setApplicationToDelete] = useState<{
+        id: string;
+        name: string;
+    } | null>(null);
+
+    const handleDeleteRequest = (id: string, name: string) => {
+        setApplicationToDelete({ id, name });
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDelete = () => {
+        if (applicationToDelete) {
+            router.delete(
+                route("applications.destroy", applicationToDelete.id)
+            );
+            setIsDeleteModalOpen(false);
+            setApplicationToDelete(null);
+        }
+    };
+
+    const cancelDelete = () => {
+        setIsDeleteModalOpen(false);
+        setApplicationToDelete(null);
+    };
 
     const ITEMS_PER_PAGE = 10;
 
@@ -631,56 +656,44 @@ const ApplicationsIndex = () => {
             {/* Applications Content */}
             {filteredApplications.length > 0 ? (
                 <>
-                    {viewType === "table" ? (
-                        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                            <div className="overflow-x-auto">
-                                <table className="w-full border-collapse text-left">
-                                    <thead>
-                                        <tr className="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
-                                            <th
-                                                className="px-4 py-3 font-semibold cursor-pointer"
-                                                onClick={() =>
-                                                    handleSort("name")
-                                                }
-                                            >
-                                                <div className="flex items-center">
-                                                    Name
-                                                    <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />
-                                                </div>
-                                            </th>
-                                            <th className="px-4 py-3 font-semibold">
-                                                Group
-                                            </th>
-                                            <th className="hidden px-4 py-3 font-semibold md:table-cell">
-                                                Description
-                                            </th>
-                                            <th className="hidden px-4 py-3 font-semibold md:table-cell">
-                                                Variables
-                                            </th>
-                                            <th className="hidden px-4 py-3 font-semibold md:table-cell">
-                                                Keys
-                                            </th>
-                                            <th
-                                                className="hidden px-4 py-3 font-semibold md:table-cell cursor-pointer"
-                                                onClick={() =>
-                                                    handleSort("created_at")
-                                                }
-                                            >
-                                                <div className="flex items-center">
-                                                    Created
-                                                    <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />
-                                                </div>
-                                            </th>
-                                            <th className="px-4 py-3 text-right font-semibold">
-                                                Actions
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200">
-                                        {isLoading
-                                            ? Array.from({
-                                                  length: 5,
-                                              }).map((_, i) => (
+                    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                        <div className="overflow-x-auto">
+                            <table className="w-full border-collapse text-left">
+                                <thead>
+                                    <tr className="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
+                                        <th
+                                            className="px-4 py-3 font-semibold cursor-pointer"
+                                            onClick={() => handleSort("name")}
+                                        >
+                                            <div className="flex items-center">
+                                                Name
+                                                <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />
+                                            </div>
+                                        </th>
+                                        <th className="px-4 py-3 font-semibold">
+                                            Group
+                                        </th>
+                                        <th className="hidden px-4 py-3 font-semibold md:table-cell">
+                                            Description
+                                        </th>
+                                        <th className="hidden px-4 py-3 font-semibold md:table-cell">
+                                            Health
+                                        </th>
+                                        <th className="hidden px-4 py-3 font-semibold md:table-cell">
+                                            Variables
+                                        </th>
+                                        <th className="hidden px-4 py-3 font-semibold md:table-cell">
+                                            Keys
+                                        </th>
+                                        <th className="px-4 py-3 text-right font-semibold">
+                                            Actions
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                    {isLoading
+                                        ? Array.from({ length: 5 }).map(
+                                              (_, i) => (
                                                   <tr key={`skeleton-${i}`}>
                                                       <td className="px-4 py-3">
                                                           <div className="flex items-center gap-3">
@@ -695,434 +708,273 @@ const ApplicationsIndex = () => {
                                                           <Skeleton className="h-5 w-48" />
                                                       </td>
                                                       <td className="hidden px-4 py-3 md:table-cell">
-                                                          <Skeleton className="h-5 w-16" />
+                                                          <Skeleton className="h-5 w-32" />
                                                       </td>
                                                       <td className="hidden px-4 py-3 md:table-cell">
                                                           <Skeleton className="h-5 w-16" />
                                                       </td>
                                                       <td className="hidden px-4 py-3 md:table-cell">
-                                                          <Skeleton className="h-5 w-24" />
+                                                          <Skeleton className="h-5 w-16" />
                                                       </td>
                                                       <td className="px-4 py-3 text-right">
                                                           <Skeleton className="h-8 w-8 rounded-md inline-block" />
                                                       </td>
                                                   </tr>
-                                              ))
-                                            : paginatedApplications.map(
-                                                  (application) => (
-                                                      <tr
-                                                          key={application.id}
-                                                          className="hover:bg-gray-50/50"
-                                                      >
-                                                          <td className="whitespace-nowrap px-4 py-3">
-                                                              <div className="flex items-center gap-3">
-                                                                  <div>
-                                                                      <Link
-                                                                          href={route(
-                                                                              "applications.show",
-                                                                              application.id
-                                                                          )}
-                                                                          className="font-medium text-gray-900 hover:text-blue-600"
-                                                                      >
-                                                                          {
-                                                                              application.name
-                                                                          }
-                                                                      </Link>
-                                                                  </div>
-                                                              </div>
-                                                          </td>
-                                                          <td className="px-4 py-3">
-                                                              {application.group ? (
+                                              )
+                                          )
+                                        : paginatedApplications.map(
+                                              (application) => (
+                                                  <tr
+                                                      key={application.id}
+                                                      className="hover:bg-gray-50/50"
+                                                  >
+                                                      <td className="whitespace-nowrap px-4 py-3">
+                                                          <div className="flex items-center gap-3">
+                                                              <div>
                                                                   <Link
                                                                       href={route(
-                                                                          "groups.show",
+                                                                          "applications.show",
+                                                                          application.id
+                                                                      )}
+                                                                      className="font-medium text-gray-900 hover:text-blue-600"
+                                                                  >
+                                                                      {
+                                                                          application.name
+                                                                      }
+                                                                  </Link>
+                                                              </div>
+                                                          </div>
+                                                      </td>
+                                                      <td className="px-4 py-3">
+                                                          {application.group ? (
+                                                              <Link
+                                                                  href={route(
+                                                                      "groups.show",
+                                                                      application
+                                                                          .group
+                                                                          .id
+                                                                  )}
+                                                                  className="inline-flex items-center gap-1"
+                                                              >
+                                                                  <Badge
+                                                                      variant="outline"
+                                                                      className="hover:bg-gray-100"
+                                                                  >
+                                                                      <FolderTree className="mr-1 h-3 w-3 text-gray-500" />
+                                                                      {
                                                                           application
                                                                               .group
-                                                                              .id
-                                                                      )}
-                                                                      className="inline-flex items-center gap-1"
-                                                                  >
-                                                                      <Badge
-                                                                          variant="outline"
-                                                                          className="hover:bg-gray-100"
-                                                                      >
-                                                                          <FolderTree className="mr-1 h-3 w-3 text-gray-500" />
-                                                                          {
-                                                                              application
-                                                                                  .group
-                                                                                  .name
-                                                                          }
-                                                                      </Badge>
-                                                                  </Link>
-                                                              ) : (
-                                                                  <span className="text-gray-400 italic text-xs">
-                                                                      No group
-                                                                  </span>
-                                                              )}
-                                                          </td>
-                                                          <td className="hidden px-4 py-3 text-gray-600 md:table-cell">
-                                                              {application.description ? (
-                                                                  <span className="line-clamp-1">
-                                                                      {
-                                                                          application.description
+                                                                              .name
                                                                       }
-                                                                  </span>
-                                                              ) : (
-                                                                  <span className="text-gray-400 italic">
-                                                                      No
-                                                                      description
-                                                                  </span>
-                                                              )}
-                                                          </td>
-                                                          <td className="hidden px-4 py-3 md:table-cell">
-                                                              <Badge
-                                                                  variant="secondary"
-                                                                  className="bg-blue-50 text-blue-800 hover:bg-blue-100"
-                                                              >
-                                                                  {application
-                                                                      .env_variables
-                                                                      ?.length ||
-                                                                      0}
-                                                              </Badge>
-                                                          </td>
-                                                          <td className="hidden px-4 py-3 md:table-cell">
-                                                              <Badge
-                                                                  variant="secondary"
-                                                                  className="bg-purple-50 text-purple-800 hover:bg-purple-100"
-                                                              >
-                                                                  {application
-                                                                      .access_keys
-                                                                      ?.length ||
-                                                                      0}
-                                                              </Badge>
-                                                          </td>
-                                                          <td className="hidden whitespace-nowrap px-4 py-3 text-gray-500 md:table-cell">
-                                                              <div className="flex items-center gap-1.5">
-                                                                  <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                                                                  <span>
-                                                                      {formatDate(
-                                                                          application.created_at
-                                                                      )}
-                                                                  </span>
-                                                              </div>
-                                                          </td>
-                                                          <td className="whitespace-nowrap px-4 py-3 text-right">
-                                                              <div className="flex items-center justify-end gap-2">
-                                                                  {canViewApplication && (
-                                                                      <TooltipProvider>
-                                                                          <Tooltip>
-                                                                              <TooltipTrigger
-                                                                                  asChild
-                                                                              >
-                                                                                  <Button
-                                                                                      variant="ghost"
-                                                                                      size="sm"
-                                                                                      className="h-8 w-8 p-0 text-gray-500 hover:text-blue-600"
-                                                                                      onClick={() =>
-                                                                                          router.visit(
-                                                                                              route(
-                                                                                                  "applications.show",
-                                                                                                  application.id
-                                                                                              )
-                                                                                          )
-                                                                                      }
-                                                                                  >
-                                                                                      <Eye className="h-4 w-4" />
-                                                                                      <span className="sr-only">
-                                                                                          View
-                                                                                      </span>
-                                                                                  </Button>
-                                                                              </TooltipTrigger>
-                                                                              <TooltipContent>
-                                                                                  <p>
-                                                                                      View
-                                                                                      application
-                                                                                      details
-                                                                                  </p>
-                                                                              </TooltipContent>
-                                                                          </Tooltip>
-                                                                      </TooltipProvider>
-                                                                  )}
-
-                                                                  {canEditApplication && (
-                                                                      <TooltipProvider>
-                                                                          <Tooltip>
-                                                                              <TooltipTrigger
-                                                                                  asChild
-                                                                              >
-                                                                                  <Button
-                                                                                      variant="ghost"
-                                                                                      size="sm"
-                                                                                      className="h-8 w-8 p-0 text-gray-500 hover:text-blue-600"
-                                                                                      onClick={() =>
-                                                                                          router.visit(
-                                                                                              route(
-                                                                                                  "applications.edit",
-                                                                                                  application.id
-                                                                                              )
-                                                                                          )
-                                                                                      }
-                                                                                  >
-                                                                                      <Edit className="h-4 w-4" />
-                                                                                      <span className="sr-only">
-                                                                                          Edit
-                                                                                      </span>
-                                                                                  </Button>
-                                                                              </TooltipTrigger>
-                                                                              <TooltipContent>
-                                                                                  <p>
-                                                                                      Edit
-                                                                                      application
-                                                                                  </p>
-                                                                              </TooltipContent>
-                                                                          </Tooltip>
-                                                                      </TooltipProvider>
-                                                                  )}
-
-                                                                  {canDeleteApplication && (
-                                                                      <TooltipProvider>
-                                                                          <Tooltip>
-                                                                              <TooltipTrigger
-                                                                                  asChild
-                                                                              >
-                                                                                  <Button
-                                                                                      variant="ghost"
-                                                                                      size="sm"
-                                                                                      className="h-8 w-8 p-0 text-gray-500 hover:text-red-600"
-                                                                                      onClick={() =>
-                                                                                          handleDelete(
-                                                                                              application.id,
-                                                                                              application.name
-                                                                                          )
-                                                                                      }
-                                                                                  >
-                                                                                      <Trash className="h-4 w-4" />
-                                                                                      <span className="sr-only">
-                                                                                          Delete
-                                                                                      </span>
-                                                                                  </Button>
-                                                                              </TooltipTrigger>
-                                                                              <TooltipContent>
-                                                                                  <p>
-                                                                                      Delete
-                                                                                      application
-                                                                                  </p>
-                                                                              </TooltipContent>
-                                                                          </Tooltip>
-                                                                      </TooltipProvider>
-                                                                  )}
-                                                              </div>
-                                                          </td>
-                                                      </tr>
-                                                  )
-                                              )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {isLoading
-                                ? Array.from({ length: 6 }).map((_, i) => (
-                                      <div
-                                          key={`card-skeleton-${i}`}
-                                          className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden"
-                                      >
-                                          <div className="p-5">
-                                              <div className="flex items-center gap-3 mb-4">
-                                                  <Skeleton className="h-10 w-10 rounded-md" />
-                                                  <Skeleton className="h-6 w-40" />
-                                              </div>
-                                              <Skeleton className="h-4 w-full mt-4" />
-                                              <Skeleton className="h-4 w-2/3 mt-2" />
-                                              <div className="flex justify-between mt-4">
-                                                  <Skeleton className="h-5 w-24" />
-                                                  <Skeleton className="h-8 w-8 rounded-full" />
-                                              </div>
-                                          </div>
-                                      </div>
-                                  ))
-                                : paginatedApplications.map((application) => (
-                                      <div
-                                          key={application.id}
-                                          className="group rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden transition-all hover:shadow-md hover:border-blue-200"
-                                      >
-                                          <div
-                                              className="h-2 w-full"
-                                              style={{
-                                                  background:
-                                                      getApplicationColorGradient(
-                                                          application.name
-                                                      ),
-                                              }}
-                                          ></div>
-                                          <div className="p-5">
-                                              <div className="flex items-center justify-between mb-4">
-                                                  <div className="flex items-center gap-3">
-                                                      <div
-                                                          className="h-10 w-10 flex-shrink-0 rounded-md flex items-center justify-center text-white font-semibold"
-                                                          style={{
-                                                              background:
-                                                                  getApplicationColorGradient(
-                                                                      application.name
-                                                                  ),
-                                                          }}
-                                                      >
-                                                          {getApplicationInitial(
-                                                              application.name
-                                                          )}
-                                                      </div>
-                                                      <Link
-                                                          href={route(
-                                                              "applications.show",
-                                                              application.id
-                                                          )}
-                                                          className="font-semibold text-gray-900 hover:text-blue-600 group-hover:text-blue-600 transition-colors"
-                                                      >
-                                                          {application.name}
-                                                      </Link>
-                                                  </div>
-
-                                                  <DropdownMenu>
-                                                      <DropdownMenuTrigger
-                                                          asChild
-                                                      >
-                                                          <Button
-                                                              variant="ghost"
-                                                              size="sm"
-                                                              className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
-                                                          >
-                                                              <MoreHorizontal className="h-4 w-4" />
-                                                              <span className="sr-only">
-                                                                  Open menu
+                                                                  </Badge>
+                                                              </Link>
+                                                          ) : (
+                                                              <span className="text-gray-400 italic text-xs">
+                                                                  No group
                                                               </span>
-                                                          </Button>
-                                                      </DropdownMenuTrigger>
-                                                      <DropdownMenuContent align="end">
-                                                          {canViewApplication && (
-                                                              <DropdownMenuItem
-                                                                  className="cursor-pointer"
-                                                                  onClick={() =>
-                                                                      router.visit(
-                                                                          route(
-                                                                              "applications.show",
-                                                                              application.id
-                                                                          )
-                                                                      )
+                                                          )}
+                                                      </td>
+                                                      <td className="hidden px-4 py-3 text-gray-600 md:table-cell">
+                                                          {application.description ? (
+                                                              <span className="line-clamp-1">
+                                                                  {
+                                                                      application.description
                                                                   }
-                                                              >
-                                                                  <Eye className="mr-2 h-4 w-4" />
-                                                                  View
-                                                              </DropdownMenuItem>
+                                                              </span>
+                                                          ) : (
+                                                              <span className="text-gray-400 italic">
+                                                                  No description
+                                                              </span>
                                                           )}
-
-                                                          {canEditApplication && (
-                                                              <DropdownMenuItem
-                                                                  className="cursor-pointer"
-                                                                  onClick={() =>
-                                                                      router.visit(
-                                                                          route(
-                                                                              "applications.edit",
-                                                                              application.id
-                                                                          )
-                                                                      )
-                                                                  }
-                                                              >
-                                                                  <Edit className="mr-2 h-4 w-4" />
-                                                                  Edit
-                                                              </DropdownMenuItem>
-                                                          )}
-
-                                                          {canDeleteApplication && (
-                                                              <>
-                                                                  <DropdownMenuSeparator />
-                                                                  <DropdownMenuItem
-                                                                      className="cursor-pointer text-red-600 focus:text-red-600"
-                                                                      onClick={() =>
-                                                                          handleDelete(
-                                                                              application.id,
-                                                                              application.name
-                                                                          )
-                                                                      }
-                                                                  >
-                                                                      <Trash className="mr-2 h-4 w-4" />
-                                                                      Delete
-                                                                  </DropdownMenuItem>
-                                                              </>
-                                                          )}
-                                                      </DropdownMenuContent>
-                                                  </DropdownMenu>
-                                              </div>
-
-                                              {application.group && (
-                                                  <div className="mb-3">
-                                                      <Badge
-                                                          variant="outline"
-                                                          className="flex items-center w-fit"
-                                                      >
-                                                          <FolderTree className="mr-1 h-3 w-3 text-gray-500" />
-                                                          {
-                                                              application.group
-                                                                  .name
-                                                          }
-                                                      </Badge>
-                                                  </div>
-                                              )}
-
-                                              <div className="text-sm text-gray-600 line-clamp-2 min-h-[40px]">
-                                                  {application.description ? (
-                                                      application.description
-                                                  ) : (
-                                                      <span className="text-gray-400 italic">
-                                                          No description
-                                                      </span>
-                                                  )}
-                                              </div>
-
-                                              <div className="mt-4 flex items-center justify-between">
-                                                  <div className="flex items-center gap-4">
-                                                      <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                                                          <Database className="h-3.5 w-3.5 text-blue-500" />
-                                                          <span>
+                                                      </td>
+                                                      <td className="hidden px-4 py-3 md:table-cell">
+                                                          <div className="flex flex-col">
+                                                              <div className="flex items-center justify-between mb-1">
+                                                                  <span className="text-xs font-medium text-gray-700">
+                                                                      {application.health ===
+                                                                      100 ? (
+                                                                          <span className="text-green-600">
+                                                                              Safe
+                                                                              to
+                                                                              delete
+                                                                          </span>
+                                                                      ) : (
+                                                                          `${application.health}% filled`
+                                                                      )}
+                                                                  </span>
+                                                              </div>
+                                                              <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                                                  <div
+                                                                      className={`h-1.5 rounded-full ${
+                                                                          application.health ===
+                                                                          100
+                                                                              ? "bg-green-500"
+                                                                              : application.health >=
+                                                                                70
+                                                                              ? "bg-blue-500"
+                                                                              : application.health >=
+                                                                                40
+                                                                              ? "bg-yellow-500"
+                                                                              : "bg-red-500"
+                                                                      }`}
+                                                                      style={{
+                                                                          width: `${application.health}%`,
+                                                                      }}
+                                                                  ></div>
+                                                              </div>
+                                                          </div>
+                                                      </td>
+                                                      <td className="hidden px-4 py-3 md:table-cell">
+                                                          <Badge
+                                                              variant="secondary"
+                                                              className="bg-blue-50 text-blue-800 hover:bg-blue-100"
+                                                          >
                                                               {application
                                                                   .env_variables
                                                                   ?.length || 0}
-                                                          </span>
-                                                      </div>
-                                                      <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                                                          <Key className="h-3.5 w-3.5 text-purple-500" />
-                                                          <span>
+                                                          </Badge>
+                                                      </td>
+                                                      <td className="hidden px-4 py-3 md:table-cell">
+                                                          <Badge
+                                                              variant="secondary"
+                                                              className="bg-purple-50 text-purple-800 hover:bg-purple-100"
+                                                          >
                                                               {application
                                                                   .access_keys
                                                                   ?.length || 0}
-                                                          </span>
-                                                      </div>
-                                                      <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                                                          <Clock className="h-3.5 w-3.5 text-gray-400" />
-                                                          <span>
-                                                              {formatDate(
-                                                                  application.created_at
+                                                          </Badge>
+                                                      </td>
+                                                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                                                          <div className="flex items-center justify-end gap-2">
+                                                              {canViewApplication && (
+                                                                  <TooltipProvider>
+                                                                      <Tooltip>
+                                                                          <TooltipTrigger
+                                                                              asChild
+                                                                          >
+                                                                              <Button
+                                                                                  variant="ghost"
+                                                                                  size="sm"
+                                                                                  className="h-8 w-8 p-0 text-gray-500 hover:text-blue-600"
+                                                                                  onClick={() =>
+                                                                                      router.visit(
+                                                                                          route(
+                                                                                              "applications.show",
+                                                                                              application.id
+                                                                                          )
+                                                                                      )
+                                                                                  }
+                                                                              >
+                                                                                  <Eye className="h-4 w-4" />
+                                                                                  <span className="sr-only">
+                                                                                      View
+                                                                                  </span>
+                                                                              </Button>
+                                                                          </TooltipTrigger>
+                                                                          <TooltipContent>
+                                                                              <p>
+                                                                                  View
+                                                                                  application
+                                                                                  details
+                                                                              </p>
+                                                                          </TooltipContent>
+                                                                      </Tooltip>
+                                                                  </TooltipProvider>
                                                               )}
-                                                          </span>
-                                                      </div>
-                                                  </div>
 
-                                                  <Link
-                                                      href={route(
-                                                          "applications.show",
-                                                          application.id
-                                                      )}
-                                                      className="text-xs font-medium text-blue-600 hover:text-blue-700"
-                                                  >
-                                                      Details →
-                                                  </Link>
-                                              </div>
-                                          </div>
-                                      </div>
-                                  ))}
+                                                              {canEditApplication && (
+                                                                  <TooltipProvider>
+                                                                      <Tooltip>
+                                                                          <TooltipTrigger
+                                                                              asChild
+                                                                          >
+                                                                              <Button
+                                                                                  variant="ghost"
+                                                                                  size="sm"
+                                                                                  className="h-8 w-8 p-0 text-gray-500 hover:text-blue-600"
+                                                                                  onClick={() =>
+                                                                                      router.visit(
+                                                                                          route(
+                                                                                              "applications.edit",
+                                                                                              application.id
+                                                                                          )
+                                                                                      )
+                                                                                  }
+                                                                              >
+                                                                                  <Edit className="h-4 w-4" />
+                                                                                  <span className="sr-only">
+                                                                                      Edit
+                                                                                  </span>
+                                                                              </Button>
+                                                                          </TooltipTrigger>
+                                                                          <TooltipContent>
+                                                                              <p>
+                                                                                  Edit
+                                                                                  application
+                                                                              </p>
+                                                                          </TooltipContent>
+                                                                      </Tooltip>
+                                                                  </TooltipProvider>
+                                                              )}
+
+                                                              {canDeleteApplication && (
+                                                                  <TooltipProvider>
+                                                                      <Tooltip>
+                                                                          <TooltipTrigger
+                                                                              asChild
+                                                                          >
+                                                                              <Button
+                                                                                  variant="ghost"
+                                                                                  size="sm"
+                                                                                  className={`h-8 w-8 p-0 ${
+                                                                                      parseFloat(
+                                                                                          application.health.toString()
+                                                                                      ) ===
+                                                                                      0
+                                                                                          ? "text-gray-500 hover:text-red-600"
+                                                                                          : "text-gray-300 cursor-not-allowed"
+                                                                                  }`}
+                                                                                  onClick={() =>
+                                                                                      parseFloat(
+                                                                                          application.health.toString()
+                                                                                      ) ===
+                                                                                          0 &&
+                                                                                      handleDeleteRequest(
+                                                                                          application.id,
+                                                                                          application.name
+                                                                                      )
+                                                                                  }
+                                                                                  disabled={
+                                                                                      parseFloat(
+                                                                                          application.health.toString()
+                                                                                      ) !==
+                                                                                      0.0
+                                                                                  }
+                                                                              >
+                                                                                  <Trash className="h-4 w-4" />
+                                                                                  <span className="sr-only">
+                                                                                      Delete
+                                                                                  </span>
+                                                                              </Button>
+                                                                          </TooltipTrigger>
+                                                                          <TooltipContent>
+                                                                              {application.health >
+                                                                              0
+                                                                                  ? "Cannot delete - contains filled values"
+                                                                                  : "Delete application"}
+                                                                          </TooltipContent>
+                                                                      </Tooltip>
+                                                                  </TooltipProvider>
+                                                              )}
+                                                          </div>
+                                                      </td>
+                                                  </tr>
+                                              )
+                                          )}
+                                </tbody>
+                            </table>
                         </div>
-                    )}
-
+                    </div>
                     {/* Pagination */}
                     <ClientPagination />
                 </>
@@ -1151,6 +1003,51 @@ const ApplicationsIndex = () => {
                         )}
                 </div>
             )}
+            <Dialog
+                open={isDeleteModalOpen}
+                onOpenChange={setIsDeleteModalOpen}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-red-600">
+                            <div className="flex items-center">
+                                <Trash className="mr-2 h-5 w-5" />
+                                Confirm Deletion
+                            </div>
+                        </DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete the application{" "}
+                            <span className="font-semibold text-gray-700">
+                                "{applicationToDelete?.name}"
+                            </span>
+                            ? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-2">
+                        <p className="text-sm text-gray-500">
+                            All associated environment variables and access keys
+                            will be permanently removed.
+                        </p>
+                    </div>
+                    <DialogFooter className="flex space-x-2 sm:justify-end">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={cancelDelete}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            className="bg-red-600 hover:bg-red-700"
+                            onClick={confirmDelete}
+                        >
+                            Delete Application
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AuthenticatedLayout>
     );
 };
