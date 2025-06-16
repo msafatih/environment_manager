@@ -26,15 +26,12 @@ import {
     EyeOff,
     MoreHorizontal,
     AppWindow,
-    Trash2,
-    Layers,
     Settings,
-    Monitor,
     Globe,
     CheckCircle,
-    AlertTriangle,
     Check,
     ArrowLeft,
+    Trash,
 } from "lucide-react";
 import { Button } from "@/Components/ui/button";
 import {
@@ -104,6 +101,7 @@ interface ApplicationsShowProps extends PageProps {
     canCreateAccessKeys: boolean;
     canDeleteAccessKeys: boolean;
     canEditEnvValues: boolean;
+    canViewEnvValueChanges: boolean;
 }
 
 const ApplicationsShow = () => {
@@ -113,6 +111,7 @@ const ApplicationsShow = () => {
         canCreateEnvVariables,
         canDeleteEnvVariables,
         canEditEnvValues,
+        canViewEnvValueChanges,
     } = usePage<ApplicationsShowProps>().props;
 
     const [searchVariables, setSearchVariables] = useState("");
@@ -129,8 +128,9 @@ const ApplicationsShow = () => {
     const [copySuccess, setCopySuccess] = useState<string | null>(null);
     const [sortField, setSortField] = useState("name");
     const [sortDirection, setSortDirection] = useState("asc");
+    const [deletingVariable, setDeletingVariable] = useState<any>(null);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-    // Filter and sort env variables based on sequence and search
     const filteredEnvVariables =
         application.env_variables
             ?.filter((variable) =>
@@ -153,7 +153,6 @@ const ApplicationsShow = () => {
                     .includes(searchKeys.toLowerCase())
         ) || [];
 
-    // Toggle visibility of secret values
     const toggleSecretVisibility = (id: string) => {
         setShowSecretValues((prev) => ({
             ...prev,
@@ -176,7 +175,6 @@ const ApplicationsShow = () => {
                 ? a.name.localeCompare(b.name)
                 : b.name.localeCompare(a.name);
         } else if (sortField === "sequence") {
-            // Handle null sequence values
             if (a.sequence === null && b.sequence === null) return 0;
             if (a.sequence === null) return sortDirection === "asc" ? 1 : -1;
             if (b.sequence === null) return sortDirection === "asc" ? -1 : 1;
@@ -193,18 +191,43 @@ const ApplicationsShow = () => {
         return 0;
     });
 
-    // Copy to clipboard function
     const copyToClipboard = (text: string, variableName: string) => {
         navigator.clipboard.writeText(text);
         setCopySuccess(variableName);
         setTimeout(() => setCopySuccess(null), 2000);
     };
 
-    const handleDeleteEnvVariable = (envVariable: string | AccessKey) => {
+    const handleDeleteEnvVariable = (envVariable: any) => {
+        setDeletingVariable(envVariable);
+        setIsDeleteDialogOpen(true);
+    };
+
+    const confirmDeleteEnvVariable = () => {
+        if (!deletingVariable) return;
+
         router.delete(
             route("applications.envVariables.destroy", {
-                application: application,
-                envVariable: envVariable,
+                application: application.id,
+                envVariable: deletingVariable.id,
+            }),
+            {
+                onSuccess: () => {
+                    setIsDeleteDialogOpen(false);
+                    setDeletingVariable(null);
+                },
+                onError: () => {
+                    setIsDeleteDialogOpen(false);
+                    setDeletingVariable(null);
+                },
+            }
+        );
+    };
+
+    const handleViewHistory = (envVariable: any) => {
+        router.get(
+            route("applications.history", {
+                application: application.id,
+                envVariable: envVariable.id,
             })
         );
     };
@@ -230,7 +253,6 @@ const ApplicationsShow = () => {
             },
             {
                 onSuccess: () => {
-                    // Update local state for immediate UI update
                     const updatedVariables = application.env_variables?.map(
                         (variable) => {
                             if (variable.env_values) {
@@ -254,7 +276,6 @@ const ApplicationsShow = () => {
                         }
                     );
 
-                    // Close the dialog and reset state
                     setIsEditDialogOpen(false);
                     setEditingEnvValue(null);
                     setIsSubmitting(false);
@@ -266,7 +287,6 @@ const ApplicationsShow = () => {
         );
     };
 
-    // Helper to render environment value
     const renderEnvValue = (variable: any, envType: string) => {
         const envValue = variable.env_values?.find(
             (value: any) =>
@@ -384,7 +404,6 @@ const ApplicationsShow = () => {
         <AuthenticatedLayout>
             <Head title={`Application: ${application.name}`} />
 
-            {/* Breadcrumb */}
             <Breadcrumb
                 items={[
                     {
@@ -395,7 +414,6 @@ const ApplicationsShow = () => {
                 ]}
             />
 
-            {/* Hero Header */}
             <div className="relative mb-8 overflow-hidden rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 shadow-lg">
                 <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,#fff,rgba(255,255,255,0.7))]"></div>
                 <div className="relative px-6 py-8 sm:px-8 md:flex md:items-center md:justify-between">
@@ -457,7 +475,6 @@ const ApplicationsShow = () => {
                     </TabsTrigger>
                 </TabsList>
 
-                {/* Environment Variables Tab */}
                 <TabsContent value="env-variables">
                     <Card>
                         <CardHeader className="border-b bg-gray-50/80 px-6">
@@ -476,7 +493,7 @@ const ApplicationsShow = () => {
                                         href={route(
                                             "applications.envVariables.create",
                                             {
-                                                application: application,
+                                                application: application.id,
                                             }
                                         )}
                                     >
@@ -573,6 +590,13 @@ const ApplicationsShow = () => {
                                                             </span>
                                                         </div>
                                                     </TableHead>
+                                                    <TableHead className="min-w-[180px]">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Globe className="h-3.5 w-3.5 text-yellow-500" />
+                                                            <span>Staging</span>
+                                                        </div>
+                                                    </TableHead>
+
                                                     <TableHead
                                                         className="w-[150px] min-w-[150px] cursor-pointer"
                                                         onClick={() =>
@@ -630,6 +654,12 @@ const ApplicationsShow = () => {
                                                                     "production"
                                                                 )}
                                                             </TableCell>
+                                                            <TableCell>
+                                                                {renderEnvValue(
+                                                                    variable,
+                                                                    "staging"
+                                                                )}
+                                                            </TableCell>
                                                             <TableCell className="text-sm text-gray-600">
                                                                 {variable.created_at
                                                                     ? new Date(
@@ -670,9 +700,9 @@ const ApplicationsShow = () => {
                                                                                                 "applications.envVariables.edit",
                                                                                                 {
                                                                                                     application:
-                                                                                                        application,
+                                                                                                        application.id,
                                                                                                     envVariable:
-                                                                                                        variable,
+                                                                                                        variable.id,
                                                                                                 }
                                                                                             )
                                                                                         )
@@ -685,11 +715,9 @@ const ApplicationsShow = () => {
                                                                             )}
                                                                             <DropdownMenuItem
                                                                                 onClick={() =>
-                                                                                    (window.location.href =
-                                                                                        route(
-                                                                                            "env-variables.show",
-                                                                                            variable.id
-                                                                                        ))
+                                                                                    handleViewHistory(
+                                                                                        variable
+                                                                                    )
                                                                                 }
                                                                             >
                                                                                 <History className="h-4 w-4 mr-2" />
@@ -699,10 +727,18 @@ const ApplicationsShow = () => {
                                                                             {canDeleteEnvVariables && (
                                                                                 <>
                                                                                     <DropdownMenuSeparator />
-                                                                                    <AlertDialog>
-                                                                                        {/* Keep existing AlertDialog content */}
-                                                                                        {/* ... */}
-                                                                                    </AlertDialog>
+                                                                                    <DropdownMenuItem
+                                                                                        className="text-red-600"
+                                                                                        onClick={() =>
+                                                                                            handleDeleteEnvVariable(
+                                                                                                variable
+                                                                                            )
+                                                                                        }
+                                                                                    >
+                                                                                        <Trash className="h-4 w-4 mr-2" />
+                                                                                        Delete
+                                                                                        Variable
+                                                                                    </DropdownMenuItem>
                                                                                 </>
                                                                             )}
                                                                         </DropdownMenuContent>
@@ -734,7 +770,7 @@ const ApplicationsShow = () => {
                                             href={route(
                                                 "applications.envVariables.create",
                                                 {
-                                                    application: application,
+                                                    application: application.id,
                                                 }
                                             )}
                                         >
@@ -750,9 +786,7 @@ const ApplicationsShow = () => {
                     </Card>
                 </TabsContent>
 
-                {/* Details Tab - unchanged */}
                 <TabsContent value="details">
-                    {/* You can keep the existing details tab content */}
                     <Card className="w-full">
                         <CardHeader className="border-b bg-gray-50/80 px-6">
                             <CardTitle className="text-xl text-gray-800">
@@ -910,7 +944,6 @@ const ApplicationsShow = () => {
                 </TabsContent>
             </Tabs>
 
-            {/* Edit Value Dialog */}
             {canEditEnvValues && (
                 <Dialog
                     open={isEditDialogOpen}
@@ -998,6 +1031,40 @@ const ApplicationsShow = () => {
                     </DialogContent>
                 </Dialog>
             )}
+
+            <AlertDialog
+                open={isDeleteDialogOpen}
+                onOpenChange={setIsDeleteDialogOpen}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Are you sure you want to delete this variable?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently
+                            delete the environment variable "
+                            <span className="font-mono font-semibold">
+                                {deletingVariable?.name}
+                            </span>
+                            " and all its values.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel
+                            onClick={() => setIsDeleteDialogOpen(false)}
+                        >
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmDeleteEnvVariable}
+                            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                        >
+                            Delete Variable
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AuthenticatedLayout>
     );
 };

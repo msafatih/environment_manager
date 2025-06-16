@@ -1,7 +1,14 @@
+"use client";
+
 import { useState, useMemo, useEffect } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { EnvValueChange, PageProps } from "@/types";
-import { Head, Link, usePage } from "@inertiajs/react";
+import type {
+    EnvValueChange,
+    PageProps,
+    Application,
+    EnvVariable,
+} from "@/types";
+import { Head, Link } from "@inertiajs/react";
 import {
     ArrowUpDown,
     Calendar,
@@ -9,7 +16,6 @@ import {
     ChevronRight,
     Clock,
     Code,
-    Eye,
     Filter,
     History,
     Key,
@@ -18,6 +24,7 @@ import {
     SlidersHorizontal,
     Tag,
     User,
+    ArrowLeft,
 } from "lucide-react";
 import { Badge } from "@/Components/ui/badge";
 import { Button } from "@/Components/ui/button";
@@ -38,12 +45,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { Breadcrumb } from "@/Components/Breadcrumb";
 import { cn } from "@/lib/utils";
 import {
@@ -53,23 +54,25 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/Components/ui/dialog";
+import { usePage } from "@inertiajs/react";
 
-interface EnvValueChangesIndexProps extends PageProps {
+interface EnvVariableHistoryProps extends PageProps {
+    application: Application;
+    envVariable: EnvVariable;
     envValueChanges: EnvValueChange[];
     canShowEnvValueChanges: boolean;
 }
 
-const EnvValueChangesIndex = () => {
-    const { envValueChanges, canShowEnvValueChanges } =
-        usePage<EnvValueChangesIndexProps>().props;
+const ApplicationsHistory = () => {
+    const { application, envVariable, envValueChanges } =
+        usePage<EnvVariableHistoryProps>().props;
 
-    // State for filtering and pagination
     const [searchTerm, setSearchTerm] = useState("");
     const [filterType, setFilterType] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
-    const [sortField, setSortField] = useState<
-        "created_at" | "variable" | "application" | "type"
-    >("created_at");
+    const [sortField, setSortField] = useState<"created_at" | "type" | "user">(
+        "created_at"
+    );
     const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
     const [selectedChange, setSelectedChange] = useState<EnvValueChange | null>(
         null
@@ -78,7 +81,6 @@ const EnvValueChangesIndex = () => {
 
     const ITEMS_PER_PAGE = 10;
 
-    // Get unique change types for filtering
     const changeTypes = useMemo(() => {
         const types = new Set<string>();
         envValueChanges.forEach((change) => {
@@ -87,21 +89,14 @@ const EnvValueChangesIndex = () => {
         return Array.from(types);
     }, [envValueChanges]);
 
-    // Client-side filtering
     const filteredChanges = useMemo(() => {
         return envValueChanges.filter((change) => {
             const matchesSearch =
                 searchTerm === "" ||
-                change.env_value?.env_variable?.name
-                    ?.toLowerCase()
-                    .includes(searchTerm.toLowerCase()) ||
-                change.env_value?.access_key?.key
-                    ?.toLowerCase()
-                    .includes(searchTerm.toLowerCase()) ||
-                change.env_value?.access_key?.application?.name
-                    ?.toLowerCase()
-                    .includes(searchTerm.toLowerCase()) ||
                 change.user?.full_name
+                    ?.toLowerCase()
+                    .includes(searchTerm.toLowerCase()) ||
+                change.env_value?.access_key?.env_type?.name
                     ?.toLowerCase()
                     .includes(searchTerm.toLowerCase());
 
@@ -112,7 +107,6 @@ const EnvValueChangesIndex = () => {
         });
     }, [envValueChanges, searchTerm, filterType]);
 
-    // Client-side sorting
     const sortedChanges = useMemo(() => {
         return [...filteredChanges].sort((a, b) => {
             if (sortField === "created_at") {
@@ -121,28 +115,15 @@ const EnvValueChangesIndex = () => {
                           new Date(b.created_at).getTime()
                     : new Date(b.created_at).getTime() -
                           new Date(a.created_at).getTime();
-            } else if (sortField === "variable") {
+            } else if (sortField === "user") {
                 return sortDirection === "asc"
-                    ? (a.env_value?.env_variable?.name || "").localeCompare(
-                          b.env_value?.env_variable?.name || ""
+                    ? (a.user?.full_name || "").localeCompare(
+                          b.user?.full_name || ""
                       )
-                    : (b.env_value?.env_variable?.name || "").localeCompare(
-                          a.env_value?.env_variable?.name || ""
-                      );
-            } else if (sortField === "application") {
-                return sortDirection === "asc"
-                    ? (
-                          a.env_value?.access_key?.application?.name || ""
-                      ).localeCompare(
-                          b.env_value?.access_key?.application?.name || ""
-                      )
-                    : (
-                          b.env_value?.access_key?.application?.name || ""
-                      ).localeCompare(
-                          a.env_value?.access_key?.application?.name || ""
+                    : (b.user?.full_name || "").localeCompare(
+                          a.user?.full_name || ""
                       );
             } else {
-                // sort by type
                 return sortDirection === "asc"
                     ? (a.type || "").localeCompare(b.type || "")
                     : (b.type || "").localeCompare(a.type || "");
@@ -150,13 +131,11 @@ const EnvValueChangesIndex = () => {
         });
     }, [filteredChanges, sortField, sortDirection]);
 
-    // Client-side pagination
     const paginatedChanges = useMemo(() => {
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
         return sortedChanges.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }, [sortedChanges, currentPage]);
 
-    // Calculate pagination details
     const totalPages = Math.ceil(sortedChanges.length / ITEMS_PER_PAGE);
     const startItem =
         sortedChanges.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0;
@@ -165,24 +144,19 @@ const EnvValueChangesIndex = () => {
         sortedChanges.length
     );
 
-    // Reset to first page when search term or filter changes
     useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm, filterType]);
 
-    // Handle sorting
-    const handleSort = (
-        field: "created_at" | "variable" | "application" | "type"
-    ) => {
+    const handleSort = (field: "created_at" | "type" | "user") => {
         if (sortField === field) {
             setSortDirection(sortDirection === "asc" ? "desc" : "asc");
         } else {
             setSortField(field);
-            setSortDirection("desc"); // Default to desc when changing fields
+            setSortDirection("desc");
         }
     };
 
-    // Format date for display
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString("en-US", {
             year: "numeric",
@@ -191,7 +165,6 @@ const EnvValueChangesIndex = () => {
         });
     };
 
-    // Format time for display
     const formatTime = (dateString: string) => {
         return new Date(dateString).toLocaleTimeString("en-US", {
             hour: "2-digit",
@@ -200,7 +173,6 @@ const EnvValueChangesIndex = () => {
         });
     };
 
-    // Get badge color based on change type
     const getChangeTypeBadgeColor = (type: string) => {
         switch (type.toLowerCase()) {
             case "create":
@@ -214,13 +186,11 @@ const EnvValueChangesIndex = () => {
         }
     };
 
-    // View change details
     const viewChangeDetails = (change: EnvValueChange) => {
         setSelectedChange(change);
         setIsViewModalOpen(true);
     };
 
-    // Mask sensitive values
     const maskValue = (value: string) => {
         if (!value) return "";
         if (value.length <= 4) return "****";
@@ -229,11 +199,9 @@ const EnvValueChangesIndex = () => {
         );
     };
 
-    // Generate pagination links
     const generatePaginationLinks = () => {
         const links = [];
 
-        // Previous button
         links.push({
             url: currentPage > 1 ? "#" : null,
             label: "Previous",
@@ -241,7 +209,6 @@ const EnvValueChangesIndex = () => {
             onClick: () => currentPage > 1 && setCurrentPage(currentPage - 1),
         });
 
-        // First page
         links.push({
             url: "#",
             label: "1",
@@ -249,7 +216,6 @@ const EnvValueChangesIndex = () => {
             onClick: () => setCurrentPage(1),
         });
 
-        // Ellipsis after first page
         if (currentPage > 3) {
             links.push({
                 url: null,
@@ -259,13 +225,12 @@ const EnvValueChangesIndex = () => {
             });
         }
 
-        // Pages around current page
         for (
             let i = Math.max(2, currentPage - 1);
             i <= Math.min(totalPages - 1, currentPage + 1);
             i++
         ) {
-            if (i === 1 || i === totalPages) continue; // Skip first and last page as they're added separately
+            if (i === 1 || i === totalPages) continue;
             links.push({
                 url: "#",
                 label: i.toString(),
@@ -274,7 +239,6 @@ const EnvValueChangesIndex = () => {
             });
         }
 
-        // Ellipsis before last page
         if (currentPage < totalPages - 2) {
             links.push({
                 url: null,
@@ -284,7 +248,6 @@ const EnvValueChangesIndex = () => {
             });
         }
 
-        // Last page (if more than one page)
         if (totalPages > 1) {
             links.push({
                 url: "#",
@@ -294,7 +257,6 @@ const EnvValueChangesIndex = () => {
             });
         }
 
-        // Next button
         links.push({
             url: currentPage < totalPages ? "#" : null,
             label: "Next",
@@ -306,7 +268,6 @@ const EnvValueChangesIndex = () => {
         return links;
     };
 
-    // Custom pagination component
     const ClientPagination = () => {
         const links = generatePaginationLinks();
 
@@ -369,7 +330,6 @@ const EnvValueChangesIndex = () => {
                             </Button>
 
                             {links.slice(1, -1).map((link, i) => {
-                                // Skip the first and last items (Previous/Next buttons)
                                 if (link.label === "...") {
                                     return (
                                         <Button
@@ -420,35 +380,52 @@ const EnvValueChangesIndex = () => {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Environment Value Changes" />
+            <Head
+                title={`History: ${envVariable.name} - ${application.name}`}
+            />
 
-            {/* Breadcrumb */}
             <Breadcrumb
                 items={[
                     {
                         label: "Applications",
                         href: route("applications.index"),
                     },
-                    { label: "Environment Changes" },
+                    {
+                        label: application.name,
+                        href: route("applications.show", application.id),
+                    },
+                    { label: `History: ${envVariable.name}` },
                 ]}
             />
 
-            {/* Header Banner */}
             <div className="relative mb-8 overflow-hidden rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 shadow-lg">
                 <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,#fff,rgba(255,255,255,0.7))]"></div>
                 <div className="relative z-10 px-6 py-8 sm:px-8 md:flex md:items-center md:justify-between">
                     <div className="mb-6 md:mb-0">
                         <h1 className="text-3xl font-bold tracking-tight text-white">
-                            Environment Changes
+                            Variable History
                         </h1>
                         <p className="mt-2 max-w-2xl text-purple-100">
-                            Track and audit changes made to environment
-                            variables across all applications.
+                            Track changes made to{" "}
+                            <span className="font-mono font-semibold">
+                                {envVariable.name}
+                            </span>{" "}
+                            in {application.name}
                         </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <Link href={route("applications.show", application.id)}>
+                            <Button
+                                variant="outline"
+                                className="gap-1.5 bg-white/10 text-white backdrop-blur-sm border-white/20 hover:bg-white/20"
+                            >
+                                <ArrowLeft className="h-4 w-4" />
+                                Back to Application
+                            </Button>
+                        </Link>
                     </div>
                 </div>
 
-                {/* Stats/Overview Cards */}
                 <div className="relative z-10 mt-6 grid grid-cols-2 gap-4 px-6 pb-8 sm:px-8 sm:grid-cols-4">
                     <div className="rounded-lg bg-white/10 p-4 backdrop-blur-sm">
                         <div className="text-sm font-medium text-white/70">
@@ -508,7 +485,6 @@ const EnvValueChangesIndex = () => {
                 </div>
             </div>
 
-            {/* View Change Details Modal */}
             <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
                 <DialogContent className="sm:max-w-[600px]">
                     <DialogHeader>
@@ -705,7 +681,6 @@ const EnvValueChangesIndex = () => {
                 </DialogContent>
             </Dialog>
 
-            {/* Main Content */}
             <Card className="shadow-sm border-gray-200">
                 <CardHeader className="border-b bg-gray-50/80 px-6 py-4">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -805,40 +780,6 @@ const EnvValueChangesIndex = () => {
                                         )}
                                     </div>
                                 </TableHead>
-                                <TableHead
-                                    className="cursor-pointer"
-                                    onClick={() => handleSort("variable")}
-                                >
-                                    <div className="flex items-center gap-1">
-                                        Variable
-                                        {sortField === "variable" && (
-                                            <ArrowUpDown
-                                                className={cn(
-                                                    "h-4 w-4 transition-transform",
-                                                    sortDirection === "desc" &&
-                                                        "transform -rotate-180"
-                                                )}
-                                            />
-                                        )}
-                                    </div>
-                                </TableHead>
-                                <TableHead
-                                    className="cursor-pointer"
-                                    onClick={() => handleSort("application")}
-                                >
-                                    <div className="flex items-center gap-1">
-                                        Application
-                                        {sortField === "application" && (
-                                            <ArrowUpDown
-                                                className={cn(
-                                                    "h-4 w-4 transition-transform",
-                                                    sortDirection === "desc" &&
-                                                        "transform -rotate-180"
-                                                )}
-                                            />
-                                        )}
-                                    </div>
-                                </TableHead>
                                 <TableHead>Environment</TableHead>
                                 <TableHead
                                     className="cursor-pointer"
@@ -857,10 +798,25 @@ const EnvValueChangesIndex = () => {
                                         )}
                                     </div>
                                 </TableHead>
-                                <TableHead>User</TableHead>
-                                <TableHead className="text-right">
-                                    Actions
+                                <TableHead
+                                    className="cursor-pointer"
+                                    onClick={() => handleSort("user")}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        User
+                                        {sortField === "user" && (
+                                            <ArrowUpDown
+                                                className={cn(
+                                                    "h-4 w-4 transition-transform",
+                                                    sortDirection === "desc" &&
+                                                        "transform -rotate-180"
+                                                )}
+                                            />
+                                        )}
+                                    </div>
                                 </TableHead>
+                                <TableHead>Old Value</TableHead>
+                                <TableHead>New Value</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -873,12 +829,12 @@ const EnvValueChangesIndex = () => {
                                         <div className="flex flex-col items-center justify-center gap-1 text-sm text-gray-500">
                                             <History className="h-8 w-8 text-gray-400" />
                                             <h3 className="font-medium">
-                                                No environment changes found
+                                                No changes found
                                             </h3>
                                             <p>
                                                 {searchTerm || filterType
                                                     ? "Try adjusting your filters"
-                                                    : "No changes have been recorded yet."}
+                                                    : "No changes have been recorded for this variable yet."}
                                             </p>
                                         </div>
                                     </TableCell>
@@ -902,44 +858,6 @@ const EnvValueChangesIndex = () => {
                                                     )}
                                                 </span>
                                             </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                <Code className="h-4 w-4 text-indigo-600" />
-                                                <span className="font-medium">
-                                                    {
-                                                        change.env_value
-                                                            ?.env_variable?.name
-                                                    }
-                                                </span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            {change.env_value?.access_key
-                                                ?.application?.id ? (
-                                                <Link
-                                                    href={route(
-                                                        "applications.show",
-                                                        change.env_value
-                                                            .access_key
-                                                            .application.id
-                                                    )}
-                                                    className="hover:text-indigo-600"
-                                                >
-                                                    {
-                                                        change.env_value
-                                                            ?.access_key
-                                                            ?.application?.name
-                                                    }
-                                                </Link>
-                                            ) : (
-                                                <span>
-                                                    {change.env_value
-                                                        ?.access_key
-                                                        ?.application?.name ||
-                                                        "N/A"}
-                                                </span>
-                                            )}
                                         </TableCell>
                                         <TableCell>
                                             <Badge
@@ -976,33 +894,35 @@ const EnvValueChangesIndex = () => {
                                                 </span>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-right">
-                                            <TooltipProvider>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="h-8"
-                                                            onClick={() =>
-                                                                viewChangeDetails(
-                                                                    change
-                                                                )
-                                                            }
-                                                        >
-                                                            <Eye className="h-3.5 w-3.5" />
-                                                            <span className="sr-only">
-                                                                View Details
-                                                            </span>
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>
-                                                            View Change Details
-                                                        </p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
+                                        <TableCell>
+                                            <div className="font-mono text-sm max-w-[150px] truncate">
+                                                {change.type === "create" ? (
+                                                    <span className="text-gray-400 italic">
+                                                        N/A
+                                                    </span>
+                                                ) : (
+                                                    <span>
+                                                        {maskValue(
+                                                            change.old_value
+                                                        )}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="font-mono text-sm max-w-[150px] truncate">
+                                                {change.type === "delete" ? (
+                                                    <span className="text-gray-400 italic">
+                                                        N/A
+                                                    </span>
+                                                ) : (
+                                                    <span>
+                                                        {maskValue(
+                                                            change.new_value
+                                                        )}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))
@@ -1021,4 +941,4 @@ const EnvValueChangesIndex = () => {
     );
 };
 
-export default EnvValueChangesIndex;
+export default ApplicationsHistory;

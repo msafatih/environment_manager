@@ -134,7 +134,6 @@ const ApplicationsEdit = () => {
                     </Link>
                 </div>
             </div>
-
             {/* Success Message */}
             {showSuccessMessage && (
                 <Alert className="mb-6 border-green-200 bg-green-50 text-green-800 animate-in fade-in slide-in-from-top-5 duration-300">

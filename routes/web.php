@@ -47,6 +47,7 @@ Route::prefix('dashboard')->group(function () {
         Route::post('envVariables',  'storeEnvVariables')->name('applications.envVariables.store');
         Route::get('envVariables/{envVariable}/edit',  'editEnvVariables')->name('applications.envVariables.edit');
         Route::put('envVariables/{envVariable}',  'updateEnvVariables')->name('applications.envVariables.update');
+        Route::get('envVariables/{envVariable}/history',  'history')->name('applications.history');
         Route::delete('envVariables/{envVariable}',  'destroyEnvVariables')->name('applications.envVariables.destroy');
         Route::put('envValues/{envValue}',  'updateEnvValue')
             ->name('applications.envValues.update');

@@ -215,6 +215,22 @@ class ApplicationController extends Controller
         }
     }
 
+    public function history(Application $application, EnvVariable $envVariable)
+    {
+        $this->authorize('view-env-value-changes');
+        $envVariable->load(['envValues', 'envValues.accessKey', 'envValues.accessKey.envType']);
+        $envValueChanges = EnvValueChange::whereHas('envValue', function ($query) use ($envVariable) {
+            $query->where('env_variable_id', $envVariable->id);
+        })->with(['user', 'envValue.accessKey.envType'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return Inertia::render('Dashboard/Applications/History', [
+            'application' => $application,
+            'envVariable' => $envVariable,
+            'envValueChanges' => $envValueChanges,
+        ]);
+    }
 
 
     public function createEnvVariables(Application $application)

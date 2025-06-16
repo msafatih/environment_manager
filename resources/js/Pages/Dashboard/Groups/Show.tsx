@@ -1,23 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-} from "@/Components/ui/dialog";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/Components/ui/select";
-import { Label } from "@/components/ui/label";
 import {
     ArrowLeft,
     Edit,
@@ -25,26 +10,16 @@ import {
     Users,
     Calendar,
     Layers,
-    PlusCircle,
     UserPlus,
     MoreHorizontal,
     Search,
     Settings,
     Clock,
-    ChevronRight,
-    Shield,
     Info,
     Eye,
-    Loader2,
 } from "lucide-react";
 import { Button } from "@/Components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-    CardFooter,
-} from "@/Components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
 import { Breadcrumb } from "@/Components/Breadcrumb";
 import {
     DropdownMenu,
@@ -65,7 +40,9 @@ import {
 } from "@/Components/ui/table";
 import { Avatar, AvatarFallback } from "@/Components/ui/avatar";
 import { Input } from "@/Components/ui/input";
-import type { Application, Group, GroupMember, PageProps } from "@/types";
+import type { Group, GroupMember, PageProps } from "@/types";
+import { formatDate } from "@/lib/utils";
+import EditRoleModal from "./Partials/EditRoleModal";
 
 interface GroupShowProps extends PageProps {
     group: Group;
@@ -74,6 +51,7 @@ interface GroupShowProps extends PageProps {
     canDeleteGroupMembers: boolean;
     canViewApplications: boolean;
 }
+
 const GroupShow = () => {
     const {
         group,
@@ -86,47 +64,42 @@ const GroupShow = () => {
     const [activeTab, setActiveTab] = useState("members");
     const [memberSearchTerm, setMemberSearchTerm] = useState("");
     const [appSearchTerm, setAppSearchTerm] = useState("");
-    const [isScrolled, setIsScrolled] = useState(false);
     const [isEditRoleModalOpen, setIsEditRoleModalOpen] = useState(false);
     const [selectedMember, setSelectedMember] = useState<GroupMember | null>(
         null
     );
-    const [selectedRole, setSelectedRole] = useState<string>("");
     const [isUpdating, setIsUpdating] = useState(false);
 
-    // Track scroll position for sticky header effects
-    useEffect(() => {
-        const handleScroll = () => {
-            setIsScrolled(window.scrollY > 20);
-        };
-        window.addEventListener("scroll", handleScroll);
-        return () => window.removeEventListener("scroll", handleScroll);
-    }, []);
+    const handleOpenEditModal = (member: GroupMember) => {
+        setSelectedMember(member);
+        setIsEditRoleModalOpen(true);
+    };
 
-    const handleDelete = () => {
-        if (
-            confirm(
-                `Are you sure you want to delete the group "${group.name}"?`
-            )
-        ) {
-            router.delete(route("groups.destroy", group.id));
+    const handleCloseEditModal = () => {
+        if (!isUpdating) {
+            setIsEditRoleModalOpen(false);
+            setSelectedMember(null);
         }
     };
-    const handleUpdateRole = () => {
+
+    const handleUpdateRole = (newRole: string) => {
         if (!selectedMember) return;
 
         setIsUpdating(true);
-
         router.put(
-            route("groups.groupMembers.update", [group, selectedMember]),
-            { role: selectedRole },
+            route("groups.groupMembers.update", {
+                group: group.id,
+                groupMember: selectedMember.id,
+            }),
+            { role: newRole },
             {
                 onSuccess: () => {
-                    setIsEditRoleModalOpen(false);
-                    setSelectedMember(null);
-                    setIsUpdating(false);
+                    handleCloseEditModal();
                 },
                 onError: () => {
+                    setIsUpdating(false);
+                },
+                onFinish: () => {
                     setIsUpdating(false);
                 },
             }
@@ -148,46 +121,12 @@ const GroupShow = () => {
         }
     };
 
-    const handleDeleteApplication = (
-        application: Application,
-        appName: string
-    ) => {
-        if (
-            confirm(
-                `Are you sure you want to delete the application "${appName}"?`
-            )
-        ) {
-            router.delete(
-                route("groups.applications.destroy", [group, application])
-            );
-        }
-    };
-
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-        });
-    };
-
-    const formatTime = (dateString: string) => {
-        return new Date(dateString).toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    };
-
     const getRoleColor = (role: string) => {
         switch (role.toLowerCase()) {
-            case "owner":
-                return "bg-purple-100 text-purple-800 border-purple-200";
             case "admin":
                 return "bg-blue-100 text-blue-800 border-blue-200";
             case "member":
                 return "bg-green-100 text-green-800 border-green-200";
-            case "viewer":
-                return "bg-gray-100 text-gray-800 border-gray-200";
             default:
                 return "bg-gray-100 text-gray-800 border-gray-200";
         }
@@ -195,14 +134,10 @@ const GroupShow = () => {
 
     const getRoleIcon = (role: string) => {
         switch (role.toLowerCase()) {
-            case "owner":
-                return <Shield className="h-3 w-3" />;
             case "admin":
                 return <Settings className="h-3 w-3" />;
             case "member":
                 return <Users className="h-3 w-3" />;
-            case "viewer":
-                return <Eye className="h-3 w-3" />;
             default:
                 return <Info className="h-3 w-3" />;
         }
@@ -217,21 +152,17 @@ const GroupShow = () => {
             .substring(0, 2);
     };
 
-    // Generate a gradient background color based on group name
     const getGroupColorGradient = () => {
-        // Simple hash function
         const hash = group.name.split("").reduce((acc, char) => {
             return char.charCodeAt(0) + ((acc << 5) - acc);
         }, 0);
 
-        // Generate hue from hash
         const hue = Math.abs(hash % 360);
         return `linear-gradient(135deg, hsl(${hue}, 80%, 45%), hsl(${
             (hue + 40) % 360
         }, 80%, 55%))`;
     };
 
-    // Filter members based on search term
     const filteredMembers = group.group_members.filter(
         (member) =>
             member.user.full_name
@@ -243,7 +174,6 @@ const GroupShow = () => {
             member.role.toLowerCase().includes(memberSearchTerm.toLowerCase())
     );
 
-    // Filter applications based on search term
     const filteredApplications = group.applications.filter(
         (app) =>
             app.name.toLowerCase().includes(appSearchTerm.toLowerCase()) ||
@@ -257,7 +187,6 @@ const GroupShow = () => {
         <AuthenticatedLayout>
             <Head title={`Group: ${group.name}`} />
 
-            {/* Breadcrumb */}
             <Breadcrumb
                 items={[
                     { label: "Groups", href: route("groups.index") },
@@ -265,10 +194,8 @@ const GroupShow = () => {
                 ]}
             />
 
-            {/* Hero Header */}
             <div className="mb-8 relative overflow-hidden rounded-xl bg-white shadow-md">
                 <div className="relative z-1 px-6 py-8 flex flex-col md:flex-row gap-6 items-center md:items-start">
-                    {/* Group Icon */}
                     <div
                         className="h-24 w-24 flex-shrink-0 rounded-xl shadow-lg flex items-center justify-center text-white"
                         style={{ background: getGroupColorGradient() }}
@@ -276,7 +203,6 @@ const GroupShow = () => {
                         <Users className="h-10 w-10" />
                     </div>
 
-                    {/* Group Info */}
                     <div className="flex-grow text-center md:text-left">
                         <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-2">
                             {group.name}
@@ -288,7 +214,6 @@ const GroupShow = () => {
                                 </span>
                             )}
                         </p>
-
                         <div className="flex flex-wrap gap-4 mt-4 justify-center md:justify-start">
                             <div className="flex items-center gap-1.5 text-sm text-gray-600">
                                 <Calendar className="h-4 w-4 text-gray-400" />
@@ -319,107 +244,6 @@ const GroupShow = () => {
                 </div>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <Card className="transition-all hover:shadow-md">
-                    <CardContent className="p-6">
-                        <div className="flex justify-between items-start">
-                            <div className="flex flex-col">
-                                <span className="text-sm font-medium text-gray-500 mb-1">
-                                    Members
-                                </span>
-                                <span className="text-3xl font-bold">
-                                    {group.group_members.length}
-                                </span>
-                                <span className="text-sm text-gray-500 mt-1">
-                                    People in this group
-                                </span>
-                            </div>
-                            <div className="p-3 rounded-xl bg-blue-100 text-blue-600">
-                                <Users className="h-6 w-6" />
-                            </div>
-                        </div>
-                        {canCreateGroupMembers && (
-                            <CardFooter className="px-0 pt-4 pb-0">
-                                <Link
-                                    href={route("groups.groupMembers.create", {
-                                        group: group,
-                                    })}
-                                    className="text-blue-600 text-sm font-medium hover:underline flex items-center gap-1"
-                                >
-                                    Add member{" "}
-                                    <ChevronRight className="h-3 w-3" />
-                                </Link>
-                            </CardFooter>
-                        )}
-                    </CardContent>
-                </Card>
-
-                <Card className="transition-all hover:shadow-md">
-                    <CardContent className="p-6">
-                        <div className="flex justify-between items-start">
-                            <div className="flex flex-col">
-                                <span className="text-sm font-medium text-gray-500 mb-1">
-                                    Applications
-                                </span>
-                                <span className="text-3xl font-bold">
-                                    {group.applications.length}
-                                </span>
-                                <span className="text-sm text-gray-500 mt-1">
-                                    Associated apps
-                                </span>
-                            </div>
-                            <div className="p-3 rounded-xl bg-purple-100 text-purple-600">
-                                <Layers className="h-6 w-6" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="transition-all hover:shadow-md">
-                    <CardContent className="p-6">
-                        <div className="flex justify-between items-start">
-                            <div className="flex flex-col">
-                                <span className="text-sm font-medium text-gray-500 mb-1">
-                                    Created
-                                </span>
-                                <span className="text-xl font-bold">
-                                    {formatDate(group.created_at)}
-                                </span>
-                                <span className="text-sm text-gray-500 mt-1">
-                                    at {formatTime(group.created_at)}
-                                </span>
-                            </div>
-                            <div className="p-3 rounded-xl bg-green-100 text-green-600">
-                                <Calendar className="h-6 w-6" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="transition-all hover:shadow-md">
-                    <CardContent className="p-6">
-                        <div className="flex justify-between items-start">
-                            <div className="flex flex-col">
-                                <span className="text-sm font-medium text-gray-500 mb-1">
-                                    Updated
-                                </span>
-                                <span className="text-xl font-bold">
-                                    {formatDate(group.updated_at)}
-                                </span>
-                                <span className="text-sm text-gray-500 mt-1">
-                                    at {formatTime(group.updated_at)}
-                                </span>
-                            </div>
-                            <div className="p-3 rounded-xl bg-amber-100 text-amber-600">
-                                <Clock className="h-6 w-6" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Tabs for Members and Applications */}
             <Tabs
                 value={activeTab}
                 onValueChange={setActiveTab}
@@ -448,7 +272,6 @@ const GroupShow = () => {
                     </TabsTrigger>
                 </TabsList>
 
-                {/* Members Tab */}
                 <TabsContent value="members" className="mt-0">
                     <Card className="shadow-sm border-t-4 border-t-blue-500">
                         <CardHeader className="flex flex-row items-center justify-between border-b bg-white px-6 py-4">
@@ -587,21 +410,17 @@ const GroupShow = () => {
                                                                         >
                                                                             {canEditGroupMembers && (
                                                                                 <DropdownMenuItem
-                                                                                    onClick={() => {
-                                                                                        setSelectedMember(
+                                                                                    onClick={() =>
+                                                                                        handleOpenEditModal(
                                                                                             member
-                                                                                        );
-                                                                                        setSelectedRole(
-                                                                                            member.role
-                                                                                        );
-                                                                                        setIsEditRoleModalOpen(
-                                                                                            true
-                                                                                        );
-                                                                                    }}
+                                                                                        )
+                                                                                    }
                                                                                 >
-                                                                                    <Edit className="mr-2 h-4 w-4" />{" "}
-                                                                                    Edit
-                                                                                    Role
+                                                                                    <Edit className="mr-2 h-4 w-4" />
+                                                                                    <span>
+                                                                                        Edit
+                                                                                        Role
+                                                                                    </span>
                                                                                 </DropdownMenuItem>
                                                                             )}
                                                                             {canDeleteGroupMembers && (
@@ -618,9 +437,11 @@ const GroupShow = () => {
                                                                                             )
                                                                                         }
                                                                                     >
-                                                                                        <Trash className="mr-2 h-4 w-4" />{" "}
-                                                                                        Remove
-                                                                                        Member
+                                                                                        <Trash className="mr-2 h-4 w-4" />
+                                                                                        <span>
+                                                                                            Remove
+                                                                                            Member
+                                                                                        </span>
                                                                                     </DropdownMenuItem>
                                                                                 </>
                                                                             )}
@@ -673,11 +494,13 @@ const GroupShow = () => {
                                         <Link
                                             href={route(
                                                 "groups.groupMembers.create",
-                                                { group: group }
+                                                {
+                                                    group: group,
+                                                }
                                             )}
                                         >
                                             <Button className="gap-1 bg-blue-600 hover:bg-blue-700">
-                                                <UserPlus className="h-4 w-4" />{" "}
+                                                <UserPlus className="h-4 w-4" />
                                                 Add First Member
                                             </Button>
                                         </Link>
@@ -688,7 +511,6 @@ const GroupShow = () => {
                     </Card>
                 </TabsContent>
 
-                {/* Applications Tab */}
                 <TabsContent value="applications" className="mt-0">
                     <Card className="shadow-sm border-t-4 border-t-purple-500">
                         <CardHeader className="flex flex-row items-center justify-between border-b bg-white px-6 py-4">
@@ -824,7 +646,6 @@ const GroupShow = () => {
                 </TabsContent>
             </Tabs>
 
-            {/* Back to Groups button */}
             <div className="flex justify-center mt-8">
                 <Link href={route("groups.index")}>
                     <Button variant="outline" className="gap-2">
@@ -832,91 +653,18 @@ const GroupShow = () => {
                     </Button>
                 </Link>
             </div>
-            {/* Edit Role Modal */}
-            <Dialog
-                open={isEditRoleModalOpen}
-                onOpenChange={setIsEditRoleModalOpen}
-            >
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Edit Member Role</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-3">
-                        {selectedMember && (
-                            <>
-                                <div className="flex items-center space-x-3 mb-4">
-                                    <Avatar className="h-10 w-10 border shadow-sm">
-                                        <AvatarFallback className="bg-blue-100 text-blue-800">
-                                            {getInitials(
-                                                selectedMember.user.full_name
-                                            )}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                        <div className="font-medium">
-                                            {selectedMember.user.full_name}
-                                        </div>
-                                        <div className="text-sm text-gray-500">
-                                            {selectedMember.user.email}
-                                        </div>
-                                    </div>
-                                </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="role">Role</Label>
-                                    <Select
-                                        value={selectedRole}
-                                        onValueChange={setSelectedRole}
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Select a role" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="admin">
-                                                Admin
-                                            </SelectItem>
-                                            <SelectItem value="member">
-                                                Member
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <p className="text-sm text-gray-500">
-                                        Group role determines what actions the
-                                        user can perform
-                                    </p>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                    <DialogFooter className="sm:justify-between">
-                        <Button
-                            variant="outline"
-                            onClick={() => setIsEditRoleModalOpen(false)}
-                            disabled={isUpdating}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
-                            onClick={handleUpdateRole}
-                            disabled={
-                                isUpdating ||
-                                selectedRole === selectedMember?.role
-                            }
-                        >
-                            {isUpdating ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Updating...
-                                </>
-                            ) : (
-                                "Update Role"
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            {selectedMember && (
+                <EditRoleModal
+                    isOpen={isEditRoleModalOpen}
+                    onClose={handleCloseEditModal}
+                    onUpdateRole={handleUpdateRole}
+                    isUpdating={isUpdating}
+                    userName={selectedMember.user.full_name}
+                    userEmail={selectedMember.user.email}
+                    currentRole={selectedMember.role}
+                />
+            )}
         </AuthenticatedLayout>
     );
 };
