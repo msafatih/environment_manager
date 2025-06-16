@@ -7,6 +7,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\EnvValueChangeController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\PasswordController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -72,4 +73,5 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
         ->name('logout');
+    Route::put('password', action: [PasswordController::class, 'update'])->name('password.update');
 });

@@ -7,7 +7,7 @@ export interface User {
     updated_at: string;
     group_members: GroupMember[];
     env_value_changes: EnvValueChange[];
-    roles: ModelHasRole[];
+    roles: Role[];
     permissions?: ModelHasPermission[];
     all_permissions?: Permission[];
 }

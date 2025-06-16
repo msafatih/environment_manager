@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\UpdateUserRequest;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Inertia\Inertia;
@@ -88,7 +89,6 @@ class UserController extends Controller
         // Authorize the action
         $this->authorize(ability: 'view-users');
 
-        // Load relationships for the user
         $user->load([
             'roles.permissions',
             'permissions',
@@ -96,19 +96,12 @@ class UserController extends Controller
             'groupMembers.group'
         ]);
 
-        // Get all direct permissions
         $directPermissions = $user->getDirectPermissions()->values();
-
-        // Get all permissions including those from roles
         $allPermissions = $user->getAllPermissions()->values();
-
-        // Calculate permissions inherited exclusively from roles
         $rolePermissions = $allPermissions->filter(function ($permission) use ($directPermissions) {
             return !$directPermissions->contains('id', $permission->id);
         })->values();
 
-
-        // Group permissions by category for better UI organization
         $permissionsByCategory = $allPermissions->groupBy(function ($permission) {
             $parts = explode('-', $permission->name);
             if (count($parts) >= 2) {
@@ -136,21 +129,49 @@ class UserController extends Controller
     public function edit(User $user)
     {
         //
+        $this->authorize(ability: 'edit-users');
+        return Inertia::render('Dashboard/Users/Edit', [
+            'user' => $user,
+        ]);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, User $user)
+    public function update(UpdateUserRequest $request, User $user)
     {
         //
+        try {
+            $validated = $request->validated();
+            $user->update($validated);
+            return redirect()->route('users.index')->with('success', 'User updated successfully!');
+        } catch (\Exception $e) {
+            Log::error('Failed to update user: ' . $e->getMessage(), [
+                'user' => $user->full_name,
+                'email' => $user->email,
+                'role' => $user->getRoleNames()->first(),
+            ]);
+            return redirect()->back()->with('error', 'Failed to update user: ' . $e->getMessage());
+        }
     }
+
 
     /**
      * Remove the specified resource from storage.
      */
     public function destroy(User $user)
     {
-        //
+        $this->authorize(ability: 'delete-users');
+        try {
+            $user->delete();
+            return redirect()->route('users.index')->with('success', 'User deleted successfully!');
+        } catch (\Exception $e) {
+            Log::error('Failed to delete user: ' . $e->getMessage(), [
+                'user' => $user->full_name,
+                'email' => $user->email,
+                'role' => $user->getRoleNames()->first(),
+            ]);
+            return redirect()->back()->with('error', 'Failed to delete user: ' . $e->getMessage());
+        }
     }
 }
