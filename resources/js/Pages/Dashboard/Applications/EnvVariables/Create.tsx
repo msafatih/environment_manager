@@ -37,7 +37,7 @@ import {
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/Components/ui/tooltip";
+} from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/Components/ui/tabs";
 
 interface CreateEnvVariablesProps extends PageProps {
@@ -50,7 +50,6 @@ const EnvVariablesCreate = () => {
     const { data, setData, post, processing, errors, reset } = useForm({
         application_id: application.id.toString(),
         name: "",
-        sequence: "10", // Default sequence value
         production_value: "",
         staging_value: "",
         development_value: "",
@@ -79,12 +78,10 @@ const EnvVariablesCreate = () => {
                 onSuccess: () => {
                     reset(
                         "name",
-                        "sequence",
                         "production_value",
                         "staging_value",
                         "development_value"
                     );
-                    setData("sequence", "10"); // Reset to default value
                     if (nameInputRef.current) {
                         nameInputRef.current.focus();
                     }
@@ -274,65 +271,6 @@ const EnvVariablesCreate = () => {
                                         </p>
                                     )}
                                 </div>
-                            )}
-                        </div>
-
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <Label
-                                    htmlFor="sequence"
-                                    className="text-sm font-medium"
-                                >
-                                    Sequence{" "}
-                                    <span className="text-gray-400 font-normal">
-                                        (Optional)
-                                    </span>
-                                </Label>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Info className="h-4 w-4 cursor-help text-gray-400" />
-                                        </TooltipTrigger>
-                                        <TooltipContent className="bg-gray-800 text-white border-gray-700">
-                                            <p className="w-60 text-xs">
-                                                Determines the order of
-                                                variables in the .env file.
-                                                Lower numbers appear first.
-                                            </p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
-                            </div>
-                            <div className="relative">
-                                <Input
-                                    id="sequence"
-                                    type="number"
-                                    placeholder="10"
-                                    value={data.sequence}
-                                    onChange={(e) =>
-                                        setData("sequence", e.target.value)
-                                    }
-                                    className={`pl-10 ${
-                                        errors.sequence
-                                            ? "border-red-300 ring-red-100"
-                                            : "border-gray-300"
-                                    } transition-all focus-visible:ring-blue-100 focus-visible:border-blue-500`}
-                                    disabled={processing}
-                                />
-                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                                    <SortAsc className="h-4 w-4" />
-                                </div>
-                            </div>
-                            {errors.sequence ? (
-                                <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                                    <span className="inline-block h-1 w-1 rounded-full bg-red-500"></span>
-                                    {errors.sequence}
-                                </p>
-                            ) : (
-                                <p className="mt-1 text-xs text-gray-500">
-                                    Determines the order of variables (default:
-                                    10)
-                                </p>
                             )}
                         </div>
 

@@ -46,7 +46,7 @@ class ApplicationController extends Controller
             'groupCount' => $groupCount,
             'canCreateApplication' => $user->can('create-applications'),
             'canEditApplication' => $user->can('edit-applications'),
-            'canDeleteApplication' => $user->can('delete-applications'), // This is the general permission check
+            'canDeleteApplication' => $user->can('delete-applications'),
             'canViewApplication' => $user->can('view-applications'),
         ]);
     }
@@ -235,10 +235,16 @@ class ApplicationController extends Controller
         try {
             DB::beginTransaction();
 
+            // Get the next sequence number for this application
+            $lastSequence = EnvVariable::where('application_id', $validatedData['application_id'])
+                ->max('sequence') ?? 0;
+
+            $nextSequence = $lastSequence + 1;
+
             $envVariable = EnvVariable::create([
                 'name' => $validatedData['name'],
                 'application_id' => $validatedData['application_id'],
-                'sequence' => $validatedData['sequence'] ?? null,
+                'sequence' => $nextSequence, // Auto-assign the next sequence number
             ]);
 
             $accessKeys = $application->accessKeys;
@@ -291,8 +297,6 @@ class ApplicationController extends Controller
             ]);
 
             DB::commit();
-
-
 
             return redirect()->route('applications.show', $application)
                 ->with('success', 'Env variable created successfully!');
@@ -410,18 +414,39 @@ class ApplicationController extends Controller
         }
     }
 
+
     public function destroyEnvVariables(Application $application, EnvVariable $envVariable)
     {
-        //
         $this->authorize('delete-env-variables');
+
         try {
+            DB::beginTransaction();
+            $deletedSequence = $envVariable->sequence;
             $envVariable->delete();
-            return redirect()->route('applications.show', $application)->with('success', 'Env variable deleted successfully!');
+            EnvVariable::where('application_id', $application->id)
+                ->where('sequence', '>', $deletedSequence)
+                ->orderBy('sequence')
+                ->get()
+                ->each(function ($env, $index) use ($deletedSequence) {
+                    $env->sequence = $deletedSequence + $index;
+                    $env->save();
+                });
+
+            DB::commit();
+
+            return redirect()->back()
+                ->with('success', 'Environment variable deleted successfully! Sequences have been updated.');
         } catch (\Exception $e) {
-            Log::error('Failed to delete env variable: ' . $e->getMessage(), [
+            DB::rollBack();
+
+            Log::error('Failed to delete environment variable: ' . $e->getMessage(), [
+                'env_variable_id' => $envVariable->id,
                 'user_id' => Auth::id(),
+                'trace' => $e->getTraceAsString(),
             ]);
-            return redirect()->back()->with('error', 'Failed to delete env variable: ' . $e->getMessage());
+
+            return redirect()->back()
+                ->with('error', 'Failed to delete environment variable: ' . $e->getMessage());
         }
     }
 
