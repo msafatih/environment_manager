@@ -74,7 +74,7 @@ export interface GroupMember {
 export interface EnvVariable {
     id: string;
     name: string;
-    sequence: string;
+    sequence: number;
     created_at: string;
     updated_at: string;
     application: Application;
@@ -86,7 +86,7 @@ export interface Application {
     id: string;
     name: string;
     description: string;
-    health : number;
+    health: number;
     created_at: string;
     updated_at: string;
     group: Group;
