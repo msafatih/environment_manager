@@ -87,8 +87,7 @@ const GroupsEdit = () => {
             <Breadcrumb
                 items={[
                     { label: "Groups", href: route("groups.index") },
-                    { label: group.name, href: route("groups.show", group.id) },
-                    { label: "Edit" },
+                    { label: `Edit ${group.name}` },
                 ]}
             />
 
@@ -105,7 +104,7 @@ const GroupsEdit = () => {
                             to better organize your environments.
                         </p>
                     </div>
-                    <Link href={route("groups.show", group.id)}>
+                    <Link href={route("groups.index")}>
                         <Button
                             variant="outline"
                             className="gap-1 bg-white/10 text-white backdrop-blur-sm border-white/20 hover:bg-white/20"

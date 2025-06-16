@@ -123,7 +123,7 @@ const ApplicationsEdit = () => {
                             </span>
                         </p>
                     </div>
-                    <Link href={route("applications.show", application.id)}>
+                    <Link href={route("applications.index")}>
                         <Button
                             variant="outline"
                             className="gap-1 bg-white/10 text-white backdrop-blur-sm border-white/20 hover:bg-white/20"
