@@ -22,6 +22,8 @@ Route::prefix('dashboard')->group(function () {
 
     Route::resource('groups', GroupController::class);
     Route::resource('applications', ApplicationController::class);
+    Route::get('applications/{application}/export', [ApplicationController::class, 'export'])
+        ->name('applications.export');
 
     Route::prefix('groups/{group}')->controller(GroupController::class)->group(function () {
         Route::prefix('/groupMembers')->group(function () {

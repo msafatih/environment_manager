@@ -32,6 +32,7 @@ import {
     Check,
     ArrowLeft,
     Trash,
+    DownloadIcon,
 } from "lucide-react";
 import { Button } from "@/Components/ui/button";
 import {
@@ -477,32 +478,49 @@ const ApplicationsShow = () => {
 
                 <TabsContent value="env-variables">
                     <Card>
-                        <CardHeader className="border-b bg-gray-50/80 px-6">
+                        <CardHeader className="border-b bg-gradient-to-r from-gray-50/80 to-gray-100/80 px-6 py-4 shadow-sm">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <CardTitle className="text-xl text-gray-800">
+                                    <CardTitle className="text-xl font-semibold text-gray-800">
                                         Environment Variables
                                     </CardTitle>
-                                    <CardDescription>
+                                    <CardDescription className="mt-1 text-sm text-gray-600">
                                         Manage environment variables for this
                                         application
                                     </CardDescription>
                                 </div>
-                                {canCreateEnvVariables && (
-                                    <Link
-                                        href={route(
-                                            "applications.envVariables.create",
-                                            {
-                                                application: application.id,
-                                            }
-                                        )}
+
+                                <div className="flex items-center space-x-3">
+                                    {canCreateEnvVariables && (
+                                        <Link
+                                            href={route(
+                                                "applications.envVariables.create",
+                                                {
+                                                    application: application.id,
+                                                }
+                                            )}
+                                        >
+                                            <Button className="gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700">
+                                                <PlusCircle className="h-4 w-4" />
+                                                New Variable
+                                            </Button>
+                                        </Link>
+                                    )}
+
+                                    <a
+                                        href={route("applications.export", {
+                                            application: application.id,
+                                        })}
                                     >
-                                        <Button className="gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700">
-                                            <PlusCircle className="h-4 w-4" />
-                                            New Variable
+                                        <Button
+                                            variant="outline"
+                                            className="gap-1.5 border-green-500 bg-white text-green-700 hover:bg-green-50"
+                                        >
+                                            <DownloadIcon className="h-4 w-4" />
+                                            Export Variables
                                         </Button>
-                                    </Link>
-                                )}
+                                    </a>
+                                </div>
                             </div>
                         </CardHeader>
                         <CardContent className="p-6">

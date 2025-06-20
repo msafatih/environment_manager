@@ -6,8 +6,8 @@ use App\Models\Application;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreApplicationRequest;
 use App\Http\Requests\UpdateApplicationRequest;
-use App\Http\Requests\StoreAccessKeyRequest;
-use App\Http\Requests\UpdateAccessKeyRequest;
+use App\Exports\EnvVariablesExport;
+use Maatwebsite\Excel\Facades\Excel;
 use App\Http\Requests\StoreEnvVariableRequest;
 use App\Http\Requests\UpdateEnvVariableRequest;
 use App\Models\AccessKey;
@@ -23,6 +23,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ApplicationController extends Controller
 {
@@ -233,6 +235,8 @@ class ApplicationController extends Controller
     }
 
 
+
+
     public function createEnvVariables(Application $application)
     {
         $this->authorize('create-env-variables');
@@ -348,56 +352,11 @@ class ApplicationController extends Controller
         try {
             DB::beginTransaction();
 
-            // Update the env variable
             $envVariable->update([
                 'name' => $validatedData['name'],
                 'sequence' => $validatedData['sequence'] ?? null,
             ]);
 
-            $accessKeys = $application->accessKeys;
-
-            foreach ($accessKeys as $accessKey) {
-                $envTypeName = $accessKey->envType->name ?? null;
-                $valueKey = strtolower(str_replace(' ', '_', $envTypeName)) . '_value';
-
-                // Find the existing env value for this access key
-                $envValue = EnvValue::where('env_variable_id', $envVariable->id)
-                    ->where('access_key_id', $accessKey->id)
-                    ->first();
-
-                $oldValue = $envValue ? $envValue->value : null;
-                $newValue = isset($validatedData[$valueKey]) ? $validatedData[$valueKey] : '';
-
-                if ($envValue) {
-                    // Update existing env value
-                    $envValue->update([
-                        'value' => $newValue,
-                    ]);
-                } else {
-                    // Create new env value if it doesn't exist
-                    $envValue = EnvValue::create([
-                        'env_variable_id' => $envVariable->id,
-                        'access_key_id' => $accessKey->id,
-                        'value' => $newValue,
-                    ]);
-                }
-
-                // Only record the change if the value has actually changed
-                if ($oldValue !== $newValue) {
-                    // Record the change
-                    EnvValueChange::create([
-                        'env_value_id' => $envValue->id,
-                        'user_id' => Auth::id(),
-                        'old_value' => $oldValue,
-                        'new_value' => $newValue ?: null,
-                        'type' => 'update',
-                    ]);
-                }
-            }
-
-            $application->updateHealth();
-
-            // Commit the transaction
             DB::commit();
 
             if ($request->wantsJson()) {
@@ -490,5 +449,27 @@ class ApplicationController extends Controller
         $application->updateHealth();
 
         return Redirect::back()->with('success', 'Env value updated successfully!');
+    }
+
+
+    /**
+     * Export environment variables as Excel file
+     *
+     * @param Application $application
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|\Symfony\Component\HttpFoundation\StreamedResponse|\Illuminate\Http\RedirectResponse
+     */
+    public function export(Application $application)
+    {
+        $filename = $application->name . '_env_variables_' . now()->format('Y-m-d') . Str::random(5) . '.xlsx';
+        try {
+            return Excel::download(new EnvVariablesExport($application), $filename);
+        } catch (\Exception $e) {
+            Log::error('Failed to export environment variables: ' . $e->getMessage(), [
+                'application_id' => $application->id,
+                'user_id' => Auth::id(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return redirect()->back()->with('error', 'Failed to export environment variables: ' . $e->getMessage());
+        }
     }
 }
