@@ -267,7 +267,7 @@ const GroupsEdit = () => {
                     </CardContent>
 
                     <CardFooter className="flex justify-end gap-3 border-t bg-gray-50/80 px-6 py-4">
-                        <Link href={route("groups.show", group.id)}>
+                        <Link href={route("groups.index")}>
                             <Button
                                 type="button"
                                 variant="outline"
