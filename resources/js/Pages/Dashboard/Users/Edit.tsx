@@ -10,7 +10,6 @@ import {
     Mail,
     Info,
     CheckCircle2,
-    Shield,
     UserCog,
     Lock,
     Save,
@@ -38,19 +37,18 @@ import {
 } from "@/components/ui/tooltip";
 import { PageProps, User } from "@/types";
 
-interface ProfileEditProps extends PageProps {
+interface ProfileEditPageProps extends PageProps {
     user: User;
 }
 
 const EditProfile = () => {
-    const { user } = usePage<ProfileEditProps>().props;
+    const { user } = usePage<ProfileEditPageProps>().props;
     const [showProfileSuccessMessage, setShowProfileSuccessMessage] =
         useState(false);
     const [showPasswordSuccessMessage, setShowPasswordSuccessMessage] =
         useState(false);
     const nameInputRef = useRef<HTMLInputElement>(null);
 
-    // Profile information form
     const {
         data: profileData,
         setData: setProfileData,
@@ -95,7 +93,7 @@ const EditProfile = () => {
 
     const handlePasswordSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(route("password.update"), {
+        put(route("password.update", user.id), {
             onSuccess: () => {
                 resetPasswordData();
                 setShowPasswordSuccessMessage(true);
@@ -122,11 +120,11 @@ const EditProfile = () => {
                 <div className="relative px-6 py-8 sm:px-8 md:flex md:items-center md:justify-between">
                     <div className="mb-6 md:mb-0">
                         <h1 className="text-3xl font-bold tracking-tight text-white">
-                            Edit Your Profile
+                            Edit {user.full_name} Profile
                         </h1>
                         <p className="mt-2 max-w-2xl text-indigo-100">
-                            Update your account information or change your
-                            password.
+                            Update {user.full_name} account information or
+                            change {user.full_name} password.
                         </p>
                     </div>
                     <Link href={route("dashboard")}>
@@ -169,8 +167,8 @@ const EditProfile = () => {
                                         Profile Information
                                     </CardTitle>
                                     <CardDescription>
-                                        Update your account's profile
-                                        information
+                                        Update {user.full_name} account's
+                                        profile information
                                     </CardDescription>
                                 </div>
                                 <div className="h-10 w-10 flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md">
@@ -200,9 +198,10 @@ const EditProfile = () => {
                                                 </TooltipTrigger>
                                                 <TooltipContent className="bg-gray-800 text-white border-gray-700">
                                                     <p className="w-60 text-xs">
-                                                        Enter your full name as
-                                                        it will appear
-                                                        throughout the system.
+                                                        Enter {user.full_name}{" "}
+                                                        full name as it will
+                                                        appear throughout the
+                                                        system.
                                                     </p>
                                                 </TooltipContent>
                                             </Tooltip>
@@ -247,8 +246,8 @@ const EditProfile = () => {
                                         </p>
                                     ) : (
                                         <p className="text-xs text-gray-500">
-                                            Your full name will be displayed in
-                                            the UI
+                                            {user.full_name} full name will be
+                                            displayed in the UI
                                         </p>
                                     )}
                                 </div>
@@ -371,8 +370,8 @@ const EditProfile = () => {
                                         Change Password
                                     </CardTitle>
                                     <CardDescription>
-                                        Ensure your account is using a secure
-                                        password
+                                        Ensure {user.full_name} account is using
+                                        a secure password
                                     </CardDescription>
                                 </div>
                                 <div className="h-10 w-10 flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md">
@@ -402,9 +401,8 @@ const EditProfile = () => {
                                                 </TooltipTrigger>
                                                 <TooltipContent className="bg-gray-800 text-white border-gray-700">
                                                     <p className="w-60 text-xs">
-                                                        Enter your current
-                                                        password to authorize
-                                                        the change.
+                                                        Enter current password
+                                                        to authorize the change.
                                                     </p>
                                                 </TooltipContent>
                                             </Tooltip>

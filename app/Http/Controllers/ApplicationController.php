@@ -351,10 +351,27 @@ class ApplicationController extends Controller
 
         try {
             DB::beginTransaction();
-
+            $oldSequence = $envVariable->sequence;
+            $newSequence = isset($validatedData['sequence']) ? (int)$validatedData['sequence'] : $oldSequence;
+            $newSequence = max(1, $newSequence);
+            if ($oldSequence != $newSequence) {
+                if ($newSequence < $oldSequence) {
+                    EnvVariable::where('application_id', $application->id)
+                        ->where('sequence', '>=', $newSequence)
+                        ->where('sequence', '<', $oldSequence)
+                        ->orderBy('sequence', 'desc')
+                        ->increment('sequence');
+                } else {
+                    EnvVariable::where('application_id', $application->id)
+                        ->where('sequence', '>', $oldSequence)
+                        ->where('sequence', '<=', $newSequence)
+                        ->orderBy('sequence')
+                        ->decrement('sequence');
+                }
+            }
             $envVariable->update([
                 'name' => $validatedData['name'],
-                'sequence' => $validatedData['sequence'] ?? null,
+                'sequence' => $newSequence,
             ]);
 
             DB::commit();
@@ -369,7 +386,6 @@ class ApplicationController extends Controller
             return redirect()->route('applications.show', $application)
                 ->with('success', 'Env variable updated successfully!');
         } catch (\Exception $e) {
-            // Rollback the transaction if any error occurs
             DB::rollBack();
 
             Log::error('Failed to update env variable: ' . $e->getMessage(), [

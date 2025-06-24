@@ -2,9 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
 class UpdatePasswordRequest extends FormRequest
@@ -24,7 +22,7 @@ class UpdatePasswordRequest extends FormRequest
   public function rules(): array
   {
     return [
-      'current_password' => ['required', 'current_password'],
+      'current_password' => ['required'],
       'password' => ['required', Password::defaults(), 'confirmed'],
     ];
   }
@@ -32,7 +30,6 @@ class UpdatePasswordRequest extends FormRequest
   public function messages(): array
   {
     return [
-      'current_password.current_password' => 'Kata sandi saat ini tidak cocok.',
       'password.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
     ];
   }
