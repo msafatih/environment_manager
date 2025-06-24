@@ -3,13 +3,7 @@
 import { useState } from "react";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import type {
-    AccessKey,
-    Application,
-    EnvType,
-    EnvValue,
-    PageProps,
-} from "@/types";
+import type { Application, EnvType, EnvValue, PageProps } from "@/types";
 import {
     Edit,
     Package,
@@ -29,7 +23,6 @@ import {
     Settings,
     Globe,
     CheckCircle,
-    Check,
     ArrowLeft,
     Trash,
     DownloadIcon,
@@ -69,28 +62,10 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from "@/Components/ui/alert-dialog";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/Components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { ArrowDownUp, ArrowDown, ArrowUp } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import EditEnvValueModal from "./Partials/EditEnvValueModal";
+import DeleteEnvVariableModal from "./Partials/DeleteEnvVariableModal";
 
 interface ApplicationsShowProps extends PageProps {
     application: Application;
@@ -116,18 +91,15 @@ const ApplicationsShow = () => {
     } = usePage<ApplicationsShowProps>().props;
 
     const [searchVariables, setSearchVariables] = useState("");
-    const [searchKeys, setSearchKeys] = useState("");
     const [showSecretValues, setShowSecretValues] = useState<
         Record<string, boolean>
     >({});
     const [editingEnvValue, setEditingEnvValue] = useState<EnvValue | null>(
         null
     );
-    const [editedValue, setEditedValue] = useState("");
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const [copySuccess, setCopySuccess] = useState<string | null>(null);
-    const [sortField, setSortField] = useState("name");
+    const [sortField, setSortField] = useState("sequence");
     const [sortDirection, setSortDirection] = useState("asc");
     const [deletingVariable, setDeletingVariable] = useState<any>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -144,15 +116,6 @@ const ApplicationsShow = () => {
                 const seqB = b.sequence === null ? 999999 : b.sequence;
                 return Number(seqA) - Number(seqB);
             }) || [];
-
-    const filteredAccessKeys =
-        application.access_keys?.filter(
-            (key) =>
-                key.key.toLowerCase().includes(searchKeys.toLowerCase()) ||
-                key.env_type?.name
-                    ?.toLowerCase()
-                    .includes(searchKeys.toLowerCase())
-        ) || [];
 
     const toggleSecretVisibility = (id: string) => {
         setShowSecretValues((prev) => ({
@@ -198,32 +161,6 @@ const ApplicationsShow = () => {
         setTimeout(() => setCopySuccess(null), 2000);
     };
 
-    const handleDeleteEnvVariable = (envVariable: any) => {
-        setDeletingVariable(envVariable);
-        setIsDeleteDialogOpen(true);
-    };
-
-    const confirmDeleteEnvVariable = () => {
-        if (!deletingVariable) return;
-
-        router.delete(
-            route("applications.envVariables.destroy", {
-                application: application.id,
-                envVariable: deletingVariable.id,
-            }),
-            {
-                onSuccess: () => {
-                    setIsDeleteDialogOpen(false);
-                    setDeletingVariable(null);
-                },
-                onError: () => {
-                    setIsDeleteDialogOpen(false);
-                    setDeletingVariable(null);
-                },
-            }
-        );
-    };
-
     const handleViewHistory = (envVariable: any) => {
         router.get(
             route("applications.history", {
@@ -235,57 +172,12 @@ const ApplicationsShow = () => {
 
     const handleEditEnvValue = (envValue: EnvValue) => {
         setEditingEnvValue(envValue);
-        setEditedValue(envValue.value);
         setIsEditDialogOpen(true);
     };
 
-    const handleSaveEnvValue = () => {
-        if (!editingEnvValue) return;
-
-        setIsSubmitting(true);
-
-        router.put(
-            route("applications.envValues.update", {
-                application: application.id,
-                envValue: editingEnvValue.id,
-            }),
-            {
-                value: editedValue,
-            },
-            {
-                onSuccess: () => {
-                    const updatedVariables = application.env_variables?.map(
-                        (variable) => {
-                            if (variable.env_values) {
-                                const updatedValues = variable.env_values.map(
-                                    (value) => {
-                                        if (value.id === editingEnvValue.id) {
-                                            return {
-                                                ...value,
-                                                value: editedValue,
-                                            };
-                                        }
-                                        return value;
-                                    }
-                                );
-                                return {
-                                    ...variable,
-                                    env_values: updatedValues,
-                                };
-                            }
-                            return variable;
-                        }
-                    );
-
-                    setIsEditDialogOpen(false);
-                    setEditingEnvValue(null);
-                    setIsSubmitting(false);
-                },
-                onError: () => {
-                    setIsSubmitting(false);
-                },
-            }
-        );
+    const handleDeleteEnvVariable = (envVariable: any) => {
+        setDeletingVariable(envVariable);
+        setIsDeleteDialogOpen(true);
     };
 
     const renderEnvValue = (variable: any, envType: string) => {
@@ -602,16 +494,16 @@ const ApplicationsShow = () => {
                                                     </TableHead>
                                                     <TableHead className="min-w-[180px]">
                                                         <div className="flex items-center gap-1.5">
-                                                            <Globe className="h-3.5 w-3.5 text-red-500" />
-                                                            <span>
-                                                                Production
-                                                            </span>
+                                                            <Globe className="h-3.5 w-3.5 text-yellow-500" />
+                                                            <span>Staging</span>
                                                         </div>
                                                     </TableHead>
                                                     <TableHead className="min-w-[180px]">
                                                         <div className="flex items-center gap-1.5">
-                                                            <Globe className="h-3.5 w-3.5 text-yellow-500" />
-                                                            <span>Staging</span>
+                                                            <Globe className="h-3.5 w-3.5 text-red-500" />
+                                                            <span>
+                                                                Production
+                                                            </span>
                                                         </div>
                                                     </TableHead>
 
@@ -669,28 +561,19 @@ const ApplicationsShow = () => {
                                                             <TableCell>
                                                                 {renderEnvValue(
                                                                     variable,
-                                                                    "production"
+                                                                    "staging"
                                                                 )}
                                                             </TableCell>
                                                             <TableCell>
                                                                 {renderEnvValue(
                                                                     variable,
-                                                                    "staging"
+                                                                    "production"
                                                                 )}
                                                             </TableCell>
                                                             <TableCell className="text-sm text-gray-600">
-                                                                {variable.created_at
-                                                                    ? new Date(
-                                                                          variable.created_at
-                                                                      ).toLocaleDateString(
-                                                                          "en-US",
-                                                                          {
-                                                                              year: "numeric",
-                                                                              month: "short",
-                                                                              day: "numeric",
-                                                                          }
-                                                                      )
-                                                                    : "-"}
+                                                                {formatDate(
+                                                                    variable.created_at
+                                                                )}
                                                             </TableCell>
                                                             <TableCell>
                                                                 <div className="flex justify-end">
@@ -963,126 +846,26 @@ const ApplicationsShow = () => {
             </Tabs>
 
             {canEditEnvValues && (
-                <Dialog
-                    open={isEditDialogOpen}
-                    onOpenChange={setIsEditDialogOpen}
-                >
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Edit Environment Value</DialogTitle>
-                            <DialogDescription>
-                                Update the value for{" "}
-                                <span className="font-mono font-semibold">
-                                    {editingEnvValue?.env_variable?.name}
-                                </span>{" "}
-                                in{" "}
-                                <span className="font-semibold">
-                                    {
-                                        editingEnvValue?.access_key?.env_type
-                                            ?.name
-                                    }{" "}
-                                    environment
-                                </span>
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="env-value">Value</Label>
-                                <Input
-                                    id="env-value"
-                                    value={editedValue}
-                                    onChange={(e) =>
-                                        setEditedValue(e.target.value)
-                                    }
-                                    placeholder="Enter new value"
-                                    className="font-mono"
-                                />
-                            </div>
-                        </div>
-
-                        <DialogFooter>
-                            <Button
-                                variant="outline"
-                                onClick={() => setIsEditDialogOpen(false)}
-                                disabled={isSubmitting}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                onClick={handleSaveEnvValue}
-                                disabled={isSubmitting}
-                                className="gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700"
-                            >
-                                {isSubmitting ? (
-                                    <>
-                                        <svg
-                                            className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <circle
-                                                className="opacity-25"
-                                                cx="12"
-                                                cy="12"
-                                                r="10"
-                                                stroke="currentColor"
-                                                strokeWidth="4"
-                                            ></circle>
-                                            <path
-                                                className="opacity-75"
-                                                fill="currentColor"
-                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                            ></path>
-                                        </svg>
-                                        Saving...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Check className="h-4 w-4" />
-                                        Save Changes
-                                    </>
-                                )}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                <EditEnvValueModal
+                    isOpen={isEditDialogOpen}
+                    onClose={() => {
+                        setIsEditDialogOpen(false);
+                        setEditingEnvValue(null);
+                    }}
+                    envValue={editingEnvValue}
+                    applicationId={application.id}
+                />
             )}
 
-            <AlertDialog
-                open={isDeleteDialogOpen}
-                onOpenChange={setIsDeleteDialogOpen}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            Are you sure you want to delete this variable?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This action cannot be undone. This will permanently
-                            delete the environment variable "
-                            <span className="font-mono font-semibold">
-                                {deletingVariable?.name}
-                            </span>
-                            " and all its values.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel
-                            onClick={() => setIsDeleteDialogOpen(false)}
-                        >
-                            Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={confirmDeleteEnvVariable}
-                            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-                        >
-                            Delete Variable
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            <DeleteEnvVariableModal
+                isOpen={isDeleteDialogOpen}
+                onClose={() => {
+                    setIsDeleteDialogOpen(false);
+                    setDeletingVariable(null);
+                }}
+                envVariable={deletingVariable}
+                applicationId={application.id}
+            />
         </AuthenticatedLayout>
     );
 };

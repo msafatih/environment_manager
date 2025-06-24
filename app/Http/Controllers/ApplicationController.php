@@ -354,21 +354,19 @@ class ApplicationController extends Controller
             $oldSequence = $envVariable->sequence;
             $newSequence = isset($validatedData['sequence']) ? (int)$validatedData['sequence'] : $oldSequence;
             $newSequence = max(1, $newSequence);
+
             if ($oldSequence != $newSequence) {
-                if ($newSequence < $oldSequence) {
-                    EnvVariable::where('application_id', $application->id)
-                        ->where('sequence', '>=', $newSequence)
-                        ->where('sequence', '<', $oldSequence)
-                        ->orderBy('sequence', 'desc')
-                        ->increment('sequence');
-                } else {
-                    EnvVariable::where('application_id', $application->id)
-                        ->where('sequence', '>', $oldSequence)
-                        ->where('sequence', '<=', $newSequence)
-                        ->orderBy('sequence')
-                        ->decrement('sequence');
+                $swapVariable = EnvVariable::where('application_id', $application->id)
+                    ->where('sequence', $newSequence)
+                    ->first();
+
+                if ($swapVariable) {
+                    $swapVariable->update([
+                        'sequence' => $oldSequence
+                    ]);
                 }
             }
+
             $envVariable->update([
                 'name' => $validatedData['name'],
                 'sequence' => $newSequence,
