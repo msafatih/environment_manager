@@ -27,8 +27,6 @@ class User extends Authenticatable
         'email',
         'password',
     ];
-    protected $appends = ['api_token'];
-
     /**
      * The attributes that should be hidden for serialization.
      *
@@ -60,11 +58,5 @@ class User extends Authenticatable
     public function envValueChanges(): HasMany
     {
         return $this->hasMany(EnvValueChange::class, 'user_id', 'id');
-    }
-
-    public function getApiTokenAttribute()
-    {
-        $token = $this->tokens()->latest()->first();
-        return $token ? explode('|', $token->token)[1] : null;
     }
 }

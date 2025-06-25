@@ -22,38 +22,40 @@ class EnvFileController extends Controller
         $user = Auth::user();
         $permissionName = 'view-' . strtolower($envType);
 
-        if (!$user->can($permissionName)) {
+        if (!$user->can($permissionName) && !$user->can($permissionName . '-' . $application->slug)) {
             return response()->json(['error' => 'You do not have permission to access this environment.'], 403);
         }
+
         $envContents = $this->generateEnvFile($application, $envType);
+
         $response = Response::make($envContents, 200);
         $response->header('Content-Type', 'text/plain');
         $response->header('Content-Disposition', 'attachment; filename=".env.' . strtolower($envType) . '"');
-
         return $response;
     }
 
     /**
-     * Download .env file using access token
+     * Download .env file using access token (for sharing via links)
      */
     public function downloadWithToken(Request $request, Application $application, string $envType, string $token)
     {
         $envType = ucfirst(strtolower($envType));
 
-        $accessKey = AccessKey::whereHas('envType', function ($query) use ($envType) {
-            $query->where('name', $envType);
-        })->where('application_id', $application->id)
-            ->where('key', $token)
-            ->first();
+        $personalAccessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
 
-        if (!$accessKey) {
-            return response()->json(['error' => 'Invalid access token.'], 403);
+        if (!$personalAccessToken) {
+            return response()->json(['error' => 'Invalid token.'], 403);
         }
 
-        // Get the environment variables for this environment type
+        $user = $personalAccessToken->tokenable;
+
+        $permissionName = 'view-' . strtolower($envType);
+        if (!$user->can($permissionName) && !$user->can($permissionName . '-' . $application->slug)) {
+            return response()->json(['error' => 'You do not have permission to access this environment.'], 403);
+        }
+
         $envContents = $this->generateEnvFile($application, $envType);
 
-        // Create a response with the .env file
         $response = Response::make($envContents, 200);
         $response->header('Content-Type', 'text/plain');
         $response->header('Content-Disposition', 'attachment; filename=".env.' . strtolower($envType) . '"');
@@ -88,6 +90,4 @@ class EnvFileController extends Controller
 
         return $envContents;
     }
-
-    
 }

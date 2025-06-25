@@ -207,7 +207,7 @@ class ApplicationController extends Controller
             'canEditStaging' => $canEditStaging,
             'canViewProduction' => $canViewProduction,
             'canEditProduction' => $canEditProduction,
-            
+
         ]);
     }
 
@@ -693,5 +693,20 @@ class ApplicationController extends Controller
         if (!\Spatie\Permission\Models\Permission::where('name', $permissionName)->exists()) {
             \Spatie\Permission\Models\Permission::create(['name' => $permissionName]);
         }
+    }
+
+    /**
+     * Generate a token for downloading environment variables
+     */
+    public function getDownloadToken(Application $application)
+    {
+    /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $tokenName = 'env-download-' . $application->slug;
+        $user->tokens()->where('name', $tokenName)->delete();
+        $token = $user->createToken($tokenName)->plainTextToken;
+        $plainToken = explode('|', $token)[1];
+        return response()->json(['token' => $plainToken]);
     }
 }

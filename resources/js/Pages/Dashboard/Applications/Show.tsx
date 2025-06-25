@@ -113,7 +113,7 @@ const ApplicationsShow = () => {
     const [sortDirection, setSortDirection] = useState("asc");
     const [deletingVariable, setDeletingVariable] = useState<any>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
+    const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
     const filteredEnvVariables =
         application.env_variables
@@ -414,7 +414,7 @@ const ApplicationsShow = () => {
                                         variant="outline"
                                         className="gap-1.5 border-green-500 bg-white text-green-700 hover:bg-green-50"
                                         onClick={() =>
-                                            setIsDownloadDialogOpen(true)
+                                            setIsDownloadModalOpen(true)
                                         }
                                     >
                                         <DownloadIcon className="h-4 w-4" />
@@ -883,14 +883,14 @@ const ApplicationsShow = () => {
                 />
             )}
             <DownloadEnvModal
-                isOpen={isDownloadDialogOpen}
-                onClose={() => setIsDownloadDialogOpen(false)}
-                applicationId={application.id}
-                applicationName={application.name}
-                envTypes={envTypes}
-                canViewDevelopment={canViewDevelopment}
-                canViewStaging={canViewStaging}
-                canViewProduction={canViewProduction}
+                isOpen={isDownloadModalOpen}
+                onClose={() => setIsDownloadModalOpen(false)}
+                application={application}
+                permissions={{
+                    canViewDevelopment,
+                    canViewStaging,
+                    canViewProduction,
+                }}
             />
         </AuthenticatedLayout>
     );

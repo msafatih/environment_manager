@@ -52,6 +52,8 @@ Route::prefix('dashboard')->group(function () {
         Route::delete('envVariables/{envVariable}',  'destroyEnvVariables')->name('applications.envVariables.destroy');
         Route::put('envValues/{envValue}',  'updateEnvValue')
             ->name('applications.envValues.update');
+        Route::get('token', 'getDownloadToken')
+            ->name('applications.token');
     });
 
 
