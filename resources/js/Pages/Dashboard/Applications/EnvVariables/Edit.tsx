@@ -14,10 +14,6 @@ import {
     Variable,
     AlertTriangle,
     SortAsc,
-    Code,
-    Eye,
-    EyeOff,
-    Server,
 } from "lucide-react";
 import { Button } from "@/Components/ui/button";
 import {
@@ -37,8 +33,7 @@ import {
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/Components/ui/tabs";
+} from "@/Components/ui/tooltip";
 
 interface EditEnvVariableProps extends PageProps {
     application: Application;
@@ -49,18 +44,13 @@ const EnvVariablesEdit = () => {
     const { application, envVariable } = usePage<EditEnvVariableProps>().props;
 
     const { data, setData, put, processing, errors } = useForm({
-        application_id: application.id.toString(),
         name: envVariable.name || "",
         sequence: envVariable.sequence ? envVariable.sequence.toString() : "10",
     });
 
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const nameInputRef = useRef<HTMLInputElement>(null);
-    const [showProductionValue, setShowProductionValue] = useState(false);
-    const [showStagingValue, setShowStagingValue] = useState(false);
-    const [showDevelopmentValue, setShowDevelopmentValue] = useState(false);
 
-    // Auto-focus name input on component mount
     useEffect(() => {
         if (nameInputRef.current) {
             nameInputRef.current.focus();

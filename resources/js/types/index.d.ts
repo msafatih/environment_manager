@@ -12,16 +12,6 @@ export interface User {
     all_permissions?: Permission[];
 }
 
-export interface Group {
-    id: string;
-    name: string;
-    description: string;
-    group_members: GroupMember[];
-    applications: Application[];
-    created_at: string;
-    updated_at: string;
-}
-
 export interface Permission {
     id: number;
     name: string;
@@ -60,6 +50,16 @@ export interface RoleHasPermission {
     role_id: number;
     permission?: Permission;
     role?: Role;
+}
+
+export interface Group {
+    id: string;
+    name: string;
+    description: string;
+    group_members: GroupMember[];
+    applications: Application[];
+    created_at: string;
+    updated_at: string;
 }
 
 export interface GroupMember {
@@ -138,5 +138,7 @@ export type PageProps<
 > = T & {
     auth: {
         user: User;
+        permissions: ModelHasPermission[];
+        roles: ModelHasRole[];
     };
 };

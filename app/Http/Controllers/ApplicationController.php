@@ -23,7 +23,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redirect;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ApplicationController extends Controller
@@ -36,20 +35,25 @@ class ApplicationController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-
-        // Load applications with related data
-        $applications = Application::with(['group', 'envVariables', 'accessKeys'])->get();
-
-        $groupCount = Group::count();
-
-
+        $this->authorize('view-any-applications');
+        $isSuperAdmin = $user->roles->contains(function ($role) {
+            return strtolower($role->name) === 'super-admin';
+        });
+        if ($isSuperAdmin) {
+            $applications = Application::with(['group', 'envVariables', 'accessKeys'])->get();
+        } else {
+            $userGroupIds = $user->groupMembers->pluck('group.id')->toArray();
+            $applications = Application::with(['group', 'envVariables', 'accessKeys'])
+                ->whereIn('group_id', $userGroupIds)
+                ->get();
+        }
         return Inertia::render('Dashboard/Applications/Index', [
             'applications' => $applications,
-            'groupCount' => $groupCount,
             'canCreateApplication' => $user->can('create-applications'),
             'canEditApplication' => $user->can('edit-applications'),
             'canDeleteApplication' => $user->can('delete-applications'),
             'canViewApplication' => $user->can('view-applications'),
+            'isSuperAdmin' => $isSuperAdmin,
         ]);
     }
 
@@ -58,32 +62,42 @@ class ApplicationController extends Controller
      */
     public function create()
     {
-        //
-        $groups = Group::all();
+        $this->authorize('create-applications');
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $isSuperAdmin = $user->roles->contains(function ($role) {
+            return strtolower($role->name) === 'super-admin';
+        });
+        if ($isSuperAdmin) {
+            $groups = Group::all();
+        } else {
+            $groupIds = $user->groupMembers()
+                ->where('role', 'admin')
+                ->pluck('group_id')
+                ->toArray();
+            $groups = Group::whereIn('id', $groupIds)->get();
+        }
 
         return Inertia::render('Dashboard/Applications/Create', [
             'groups' => $groups,
         ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
+
     public function store(StoreApplicationRequest $request)
     {
-        $this->authorize('create-applications');
-
         $validatedData = $request->validated();
-
         try {
             DB::beginTransaction();
-
             $validatedData['slug'] = str($validatedData['name'])->slug()->toString();
 
-            $application = Application::create($validatedData);
-
+            $application = Application::create([
+                'name' => $validatedData['name'],
+                'description' => $validatedData['description'] ?? null,
+                'slug' => $validatedData['slug'],
+                'group_id' => $validatedData['group_id'],
+            ]);
             $envTypes = EnvType::all();
-
             foreach ($envTypes as $envType) {
                 AccessKey::create([
                     'application_id' => $application->id,
@@ -91,21 +105,46 @@ class ApplicationController extends Controller
                     'key' => str()->random(32),
                 ]);
             }
+            $group = Group::findOrFail($validatedData['group_id']);
+            $appSlug = $application->slug;
+
+            $viewApplication = 'view-application-' . $appSlug;
+            $editApplication = 'edit-application-' . $appSlug;
+            $deleteApplication = 'delete-application-' . $appSlug;
+            $createEnvVariablePermission = 'create-env-variables-' . $appSlug;
+            $editEnvVariablePermission = 'edit-env-variables-' . $appSlug;
+            $deleteEnvVariablePermission = 'delete-env-variables-' . $appSlug;
+
+            $this->createPermissionIfNotExists($viewApplication);
+            $this->createPermissionIfNotExists($editApplication);
+            $this->createPermissionIfNotExists($deleteApplication);
+            $this->createPermissionIfNotExists($createEnvVariablePermission);
+            $this->createPermissionIfNotExists($editEnvVariablePermission);
+            $this->createPermissionIfNotExists($deleteEnvVariablePermission);
+
+            foreach ($group->groupMembers as $groupMember) {
+                $user = $groupMember->user;
+                $user->givePermissionTo($viewApplication);
+                $user->givePermissionTo($createEnvVariablePermission);
+                $user->givePermissionTo($editEnvVariablePermission);
+                $user->givePermissionTo($deleteEnvVariablePermission);
+                if ($groupMember->role === 'admin') {
+                    $user->givePermissionTo($editApplication);
+                    $user->givePermissionTo($deleteApplication);
+                }
+            }
 
             DB::commit();
-
             return redirect()
                 ->route('applications.index')
                 ->with('success', 'Application created successfully with access keys for all environment types!');
         } catch (\Exception $e) {
             DB::rollBack();
-
             Log::error('Failed to create application: ' . $e->getMessage(), [
                 'request' => $request->all(),
                 'user_id' => Auth::id(),
                 'trace' => $e->getTraceAsString(),
             ]);
-
             return redirect()
                 ->back()
                 ->with('error', 'Failed to create application: ' . $e->getMessage());
@@ -117,7 +156,11 @@ class ApplicationController extends Controller
      */
     public function show(Application $application)
     {
-        $this->authorize('view-applications');
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if (!$user->can('view-application') && !$user->can('view-application-' . $application->slug)) {
+            return Redirect::route('applications.index')->with('error', 'You do not have permission to view this application.');
+        }
 
         $application->load([
             'group',
@@ -129,28 +172,36 @@ class ApplicationController extends Controller
             'accessKeys.envType',
         ]);
 
-        /** @var \App\Models\User $user */
-        $user = Auth::user();
+        $canCreateEnvVariables = $user->can('create-env-variables')  ||
+            $user->can('create-env-variables', $application->slug);
+        $canEditEnvVariables = $user->can('edit-env-variables')  ||
+            $user->can('edit-env-variables', $application->slug);
+        $canDeleteEnvVariables = $user->can('delete-env-variables')  ||
+            $user->can('delete-env-variables', $application->slug);
+        $canEditEnvValues = $user->can('edit-env-values')  ||
+            $user->can('edit-env-values', $application->slug);
+        $canViewDevelopment = $user->can('view-development');
+        $canEditDevelopment = $user->can('edit-development');
+        $canViewStaging = $user->can('view-staging');
+        $canEditStaging = $user->can('edit-staging');
+        $canViewProduction = $user->can('view-production');
+        $canEditProduction = $user->can('edit-production');
 
-        // Get unique environment types from access keys
         $envTypes = $application->accessKeys->pluck('envType')->unique('id')->values();
-
-        $envValuesCount = $application->envVariables->reduce(function ($count, $variable) {
-            return $count + ($variable->envValues ? $variable->envValues->count() : 0);
-        }, 0);
 
         return Inertia::render('Dashboard/Applications/Show', [
             'application' => $application,
             'envTypes' => $envTypes,
-            'statistics' => [
-                'envVariablesCount' => $application->envVariables->count(),
-                'accessKeysCount' => $application->accessKeys->count(),
-                'envValuesCount' => $envValuesCount
-            ],
-            'canEditEnvVariables' => $user->can('edit-env-variables'),
-            'canDeleteEnvVariables' => $user->can('delete-env-variables'),
-            'canCreateEnvVariables' => $user->can('create-env-variables'),
-            'canEditEnvValues' => $user->can('edit-env-values'),
+            'canCreateEnvVariables' => $canCreateEnvVariables,
+            'canEditEnvVariables' => $canEditEnvVariables,
+            'canDeleteEnvVariables' => $canDeleteEnvVariables,
+            'canEditEnvValues' => $canEditEnvValues,
+            'canViewDevelopment' => $canViewDevelopment,
+            'canEditDevelopment' => $canEditDevelopment,
+            'canViewStaging' => $canViewStaging,
+            'canEditStaging' => $canEditStaging,
+            'canViewProduction' => $canViewProduction,
+            'canEditProduction' => $canEditProduction,
         ]);
     }
 
@@ -160,7 +211,11 @@ class ApplicationController extends Controller
     public function edit(Application $application)
     {
         //
-        $this->authorize('edit-applications');
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if (!$user->can('edit-applications') && !$user->can('edit-application-' . $application->slug)) {
+            return Redirect::route('applications.index')->with('error', 'You do not have permission to edit this application.');
+        }
         $groups = Group::all();
         $application->load(['group']);
 
@@ -175,16 +230,95 @@ class ApplicationController extends Controller
      */
     public function update(UpdateApplicationRequest $request, Application $application)
     {
-        //
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
         $validatedData = $request->validated();
+        $oldSlug = $application->slug;
+        $oldGroupId = $application->group_id;
+        $newGroupId = $validatedData['group_id'];
+        $nameChanged = $validatedData['name'] !== $application->name;
+
         try {
-            $validatedData['slug'] = str($validatedData['name'])->slug()->toString();
+            DB::beginTransaction();
+            $newSlug = str($validatedData['name'])->slug()->toString();
+            $validatedData['slug'] = $newSlug;
             $application->update($validatedData);
+            if ($nameChanged) {
+                $permissionMap = [
+                    'view-application-' . $oldSlug => 'view-application-' . $newSlug,
+                    'edit-application-' . $oldSlug => 'edit-application-' . $newSlug,
+                    'delete-application-' . $oldSlug => 'delete-application-' . $newSlug,
+                    'create-env-variables-' . $oldSlug => 'create-env-variables-' . $newSlug,
+                    'edit-env-variables-' . $oldSlug => 'edit-env-variables-' . $newSlug,
+                    'delete-env-variables-' . $oldSlug => 'delete-env-variables-' . $newSlug,
+                    'create-development-' . $oldSlug => 'create-development-' . $newSlug,
+                    'create-staging-' . $oldSlug => 'create-staging-' . $newSlug,
+                    'create-production-' . $oldSlug => 'create-production-' . $newSlug,
+                    'edit-env-values-' . $oldSlug => 'edit-env-values-' . $newSlug,
+                ];
+                foreach ($permissionMap as $oldPermName => $newPermName) {
+                    $this->createPermissionIfNotExists($newPermName);
+                }
+                foreach ($permissionMap as $oldPermName => $newPermName) {
+                    $oldPermission = \Spatie\Permission\Models\Permission::where('name', $oldPermName)->first();
+                    if ($oldPermission) {
+                        $usersWithPermission = $oldPermission->users;
+                        foreach ($usersWithPermission as $user) {
+                            $user->givePermissionTo($newPermName);
+                            $user->revokePermissionTo($oldPermName);
+                        }
+                    }
+                }
+            }
+            if ($oldGroupId != $newGroupId) {
+                $oldGroup = Group::findOrFail($oldGroupId);
+                $newGroup = Group::findOrFail($newGroupId);
+                $permissionSuffixes = [
+                    'view-application-',
+                    'edit-application-',
+                    'delete-application-',
+                    'create-env-variables-',
+                    'edit-env-variables-',
+                    'delete-env-variables-',
+                    'create-development-',
+                    'create-staging-',
+                    'create-production-',
+                    'edit-env-values-',
+                ];
+                foreach ($oldGroup->groupMembers as $groupMember) {
+                    $oldUser = $groupMember->user;
+                    foreach ($permissionSuffixes as $suffix) {
+                        $permissionName = $suffix . $newSlug;
+                        if ($oldUser->hasPermissionTo($permissionName)) {
+                            $oldUser->revokePermissionTo($permissionName);
+                        }
+                    }
+                }
+                foreach ($newGroup->groupMembers as $groupMember) {
+                    $newUser = $groupMember->user;
+                    $newUser->givePermissionTo('view-application-' . $newSlug);
+                    $newUser->givePermissionTo('create-env-variables-' . $newSlug);
+                    $newUser->givePermissionTo('edit-env-variables-' . $newSlug);
+                    $newUser->givePermissionTo('delete-env-variables-' . $newSlug);
+                    $newUser->givePermissionTo('edit-env-values-' . $newSlug);
+                    if ($groupMember->role === 'admin') {
+                        $newUser->givePermissionTo('edit-application-' . $newSlug);
+                        $newUser->givePermissionTo('delete-application-' . $newSlug);
+                    }
+                    $newUser->givePermissionTo('create-development-' . $newSlug);
+                    $newUser->givePermissionTo('create-staging-' . $newSlug);
+                    $newUser->givePermissionTo('create-production-' . $newSlug);
+                }
+            }
+
+            DB::commit();
             return redirect()->route('applications.index')->with('success', 'Application updated successfully!');
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error('Failed to update application: ' . $e->getMessage(), [
                 'request' => $request->all(),
                 'user_id' => Auth::id(),
+                'trace' => $e->getTraceAsString(),
             ]);
             return redirect()->back()->with('error', 'Failed to update application: ' . $e->getMessage());
         }
@@ -195,9 +329,14 @@ class ApplicationController extends Controller
      */
     public function destroy(Application $application)
     {
-        //
-        $this->authorize('delete-applications');
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if (!$user->can('delete-applications') && !$user->can('delete-application-' . $application->slug)) {
+            return redirect()->back()->with('error', 'You do not have permission to delete this application.');
+        }
+
         try {
+            DB::beginTransaction();
             if ($application->health > 0) {
                 return redirect()->back()->with(
                     'error',
@@ -207,12 +346,55 @@ class ApplicationController extends Controller
                 );
             }
 
+            $appSlug = $application->slug;
+            $permissionSuffixes = [
+                'view-application-',
+                'edit-application-',
+                'delete-application-',
+                'create-env-variables-',
+                'edit-env-variables-',
+                'delete-env-variables-',
+                'create-development-',
+                'create-staging-',
+                'create-production-',
+                'edit-env-values-',
+            ];
+            $permissionsToDelete = [];
+            foreach ($permissionSuffixes as $suffix) {
+                $permissionName = $suffix . $appSlug;
+                $permission = \Spatie\Permission\Models\Permission::where('name', $permissionName)->first();
+
+                if ($permission) {
+                    $usersWithPermission = $permission->users;
+                    foreach ($usersWithPermission as $permUser) {
+                        $permUser->revokePermissionTo($permissionName);
+                    }
+                    $permissionsToDelete[] = $permission->id;
+                }
+            }
             $application->delete();
-            return redirect()->route('applications.index')->with('success', 'Application deleted successfully!');
-        } catch (\Exception $e) {
-            Log::error('Failed to delete application: ' . $e->getMessage(), [
+            if (!empty($permissionsToDelete)) {
+                \Spatie\Permission\Models\Permission::whereIn('id', $permissionsToDelete)->delete();
+            }
+
+            DB::commit();
+
+            Log::info('Application deleted successfully with all related permissions', [
+                'application_id' => $application->id,
+                'application_slug' => $appSlug,
                 'user_id' => Auth::id(),
             ]);
+
+            return redirect()->route('applications.index')->with('success', 'Application deleted successfully!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('Failed to delete application: ' . $e->getMessage(), [
+                'application_id' => $application->id,
+                'user_id' => Auth::id(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return redirect()->back()->with('error', 'Failed to delete application: ' . $e->getMessage());
         }
     }
@@ -234,28 +416,30 @@ class ApplicationController extends Controller
         ]);
     }
 
-
-
-
     public function createEnvVariables(Application $application)
     {
-        $this->authorize('create-env-variables');
-
-
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if (!$user->can('create-env-variables') && !$user->can('create-env-variables', $application->slug)) {
+            return Redirect::route('applications.show', $application)->with('error', 'You do not have permission to create environment variables for this application.');
+        }
+        $canCreateDevelopment = $user->can('create-development');
+        $canCreateStaging = $user->can('create-staging');
+        $canCreateProduction = $user->can('create-production');
         return Inertia::render('Dashboard/Applications/EnvVariables/Create', [
             'application' => $application,
+            'canCreateDevelopment' => $canCreateDevelopment,
+            'canCreateStaging' => $canCreateStaging,
+            'canCreateProduction' => $canCreateProduction,
         ]);
     }
 
     public function storeEnvVariables(StoreEnvVariableRequest $request, Application $application)
     {
-        $this->authorize('create-env-variables');
         $validatedData = $request->validated();
 
         try {
             DB::beginTransaction();
-
-            // Get the next sequence number for this application
             $lastSequence = EnvVariable::where('application_id', $validatedData['application_id'])
                 ->max('sequence') ?? 0;
 
@@ -337,7 +521,11 @@ class ApplicationController extends Controller
     public function editEnvVariables(Application $application, EnvVariable $envVariable)
     {
         //
-        $this->authorize('edit-env-variables');
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if (!$user->can('edit-env-variables') && !$user->can('edit-env-variables', $application->slug)) {
+            return Redirect::route('applications.show', $application)->with('error', 'You do not have permission to edit environment variables for this application.');
+        }
         return Inertia::render('Dashboard/Applications/EnvVariables/Edit', [
             'application' => $application,
             'envVariable' => $envVariable,
@@ -346,7 +534,6 @@ class ApplicationController extends Controller
 
     public function updateEnvVariables(UpdateEnvVariableRequest $request, Application $application, EnvVariable $envVariable)
     {
-        $this->authorize('edit-env-variables');
         $validatedData = $request->validated();
 
         try {
@@ -406,8 +593,11 @@ class ApplicationController extends Controller
 
     public function destroyEnvVariables(Application $application, EnvVariable $envVariable)
     {
-        $this->authorize('delete-env-variables');
-
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if (!$user->can('delete-env-variables') && !$user->can('delete-env-variables', $application->slug)) {
+            return redirect()->back()->with('error', 'You do not have permission to delete environment variables for this application.');
+        }
         try {
             DB::beginTransaction();
             $deletedSequence = $envVariable->sequence;
@@ -441,9 +631,11 @@ class ApplicationController extends Controller
 
     public function updateEnvValue(Request $request, Application $application, EnvValue $envValue)
     {
-        $this->authorize('edit-env-values');
-
-        // Validate the request
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if (!$user->can('edit-env-values') && !$user->can('edit-env-values', $application->slug)) {
+            return redirect()->back()->with('error', 'You do not have permission to edit environment values for this application.');
+        }
         $validated = $request->validate([
             'value' => 'nullable|string',
         ]);
@@ -484,6 +676,16 @@ class ApplicationController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
             return redirect()->back()->with('error', 'Failed to export environment variables: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Helper method to create permission if it doesn't exist
+     */
+    private function createPermissionIfNotExists(string $permissionName)
+    {
+        if (!\Spatie\Permission\Models\Permission::where('name', $permissionName)->exists()) {
+            \Spatie\Permission\Models\Permission::create(['name' => $permissionName]);
         }
     }
 }

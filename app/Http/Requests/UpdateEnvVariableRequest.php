@@ -14,7 +14,10 @@ class UpdateEnvVariableRequest extends FormRequest
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        return $user->can('edit-env-variables');
+        if (!$user->can('edit-env-variables') && !$user->can('edit-env-variables', $this->route('application')->slug)) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -28,7 +31,6 @@ class UpdateEnvVariableRequest extends FormRequest
             //
             'name' => 'required|string|max:255',
             'sequence' => 'nullable|integer',
-            'application_id' => 'required|exists:applications,id',
         ];
     }
 }

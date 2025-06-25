@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use App\Models\Group;
 
 class StoreApplicationRequest extends FormRequest
 {
@@ -14,7 +15,25 @@ class StoreApplicationRequest extends FormRequest
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        return $user->can('create-applications');
+        $hasGlobalPermission = $user->can('create-applications');
+        $groupId = $this->input('group_id');
+        $hasGroupPermission = false;
+
+        if ($groupId) {
+            $group = Group::find($groupId);
+            if ($group) {
+                $hasGroupPermission = $user->can('create-applications-' . $group->slug);
+                $isGroupAdmin = $user->groupMembers()
+                    ->where('group_id', $groupId)
+                    ->where('role', 'admin')
+                    ->exists();
+                $isSuperAdmin = $user->roles->contains(function ($role) {
+                    return strtolower($role->name) === 'super-admin';
+                });
+                return $hasGlobalPermission || $hasGroupPermission || $isGroupAdmin || $isSuperAdmin;
+            }
+        }
+        return $hasGlobalPermission;
     }
 
     /**

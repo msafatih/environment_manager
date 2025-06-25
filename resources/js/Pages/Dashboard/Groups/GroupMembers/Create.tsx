@@ -88,7 +88,6 @@ const GroupMembersCreate = () => {
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchQuery(e.target.value);
     };
-
     const selectUser = (user: UserType) => {
         setSelectedUser(user);
         setData("user_id", user.id.toString());
@@ -97,16 +96,8 @@ const GroupMembersCreate = () => {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(route("groups.groupMembers.store", { group: group.id }), {
-            onSuccess: () => {
-                setSelectedUser(null);
-                reset();
-                setShowSuccessMessage(true);
-                setTimeout(() => setShowSuccessMessage(false), 3000);
-            },
-        });
+        post(route("groups.groupMembers.store", { group: group.id }));
     };
-
     return (
         <AuthenticatedLayout>
             <Head title={`Add Member to ${group.name}`} />
@@ -122,7 +113,6 @@ const GroupMembersCreate = () => {
                     { label: "Add Member" },
                 ]}
             />
-
             {/* Hero Header */}
             <div className="relative mb-8 overflow-hidden rounded-xl bg-gradient-to-r from-violet-500 to-indigo-600 shadow-lg">
                 <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,#fff,rgba(255,255,255,0.7))]"></div>

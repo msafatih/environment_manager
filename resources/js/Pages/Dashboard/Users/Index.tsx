@@ -11,8 +11,6 @@ import {
     Search,
     Trash,
     ArrowUpDown,
-    ChevronLeft,
-    ChevronRight,
     User as UserIcon,
 } from "lucide-react";
 import {
@@ -33,6 +31,9 @@ import {
     TooltipTrigger,
 } from "@/Components/ui/tooltip";
 import { Avatar, AvatarFallback } from "@/Components/ui/avatar";
+import { formatDate } from "@/lib/utils";
+import ClientPagination from "@/Components/ClientPagination";
+import DeleteUserModal from "./Partials/DeleteUserModal";
 
 interface UsersIndexProps extends PageProps {
     users: User[];
@@ -50,6 +51,11 @@ const UsersIndex = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [sortField, setSortField] = useState<keyof User>("full_name");
     const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+    const [userToDelete, setUserToDelete] = useState<{
+        id: number;
+        name: string;
+    } | null>(null);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
     const ITEMS_PER_PAGE = 10;
 
@@ -107,11 +113,8 @@ const UsersIndex = () => {
         return sortedUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }, [sortedUsers, currentPage]);
 
-    // Calculate pagination details
+    // Calculate total pages for pagination
     const totalPages = Math.ceil(sortedUsers.length / ITEMS_PER_PAGE);
-    const startItem =
-        sortedUsers.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0;
-    const endItem = Math.min(currentPage * ITEMS_PER_PAGE, sortedUsers.length);
 
     // Reset to first page when search term changes
     useEffect(() => {
@@ -127,209 +130,9 @@ const UsersIndex = () => {
         }
     };
 
-    const handleDelete = (id: number, name: string) => {
-        if (confirm(`Are you sure you want to delete the user "${name}"?`)) {
-            router.delete(route("users.destroy", id));
-        }
-    };
-
-    // Format date for display
-    const formatDate = (dateString?: string): string => {
-        if (!dateString) return "Not verified";
-        return new Date(dateString).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-        });
-    };
-
-    // Generate pagination links
-    const generatePaginationLinks = () => {
-        const links = [];
-
-        // Previous button
-        links.push({
-            url: currentPage > 1 ? "#" : null,
-            label: "Previous",
-            active: false,
-            onClick: () => currentPage > 1 && setCurrentPage(currentPage - 1),
-        });
-
-        // First page
-        links.push({
-            url: "#",
-            label: "1",
-            active: currentPage === 1,
-            onClick: () => setCurrentPage(1),
-        });
-
-        // Ellipsis after first page
-        if (currentPage > 3) {
-            links.push({
-                url: null,
-                label: "...",
-                active: false,
-                onClick: () => {},
-            });
-        }
-
-        // Pages around current page
-        for (
-            let i = Math.max(2, currentPage - 1);
-            i <= Math.min(totalPages - 1, currentPage + 1);
-            i++
-        ) {
-            if (i === 1 || i === totalPages) continue; // Skip first and last page as they're added separately
-            links.push({
-                url: "#",
-                label: i.toString(),
-                active: currentPage === i,
-                onClick: () => setCurrentPage(i),
-            });
-        }
-
-        // Ellipsis before last page
-        if (currentPage < totalPages - 2) {
-            links.push({
-                url: null,
-                label: "...",
-                active: false,
-                onClick: () => {},
-            });
-        }
-
-        // Last page (if more than one page)
-        if (totalPages > 1) {
-            links.push({
-                url: "#",
-                label: totalPages.toString(),
-                active: currentPage === totalPages,
-                onClick: () => setCurrentPage(totalPages),
-            });
-        }
-
-        // Next button
-        links.push({
-            url: currentPage < totalPages ? "#" : null,
-            label: "Next",
-            active: false,
-            onClick: () =>
-                currentPage < totalPages && setCurrentPage(currentPage + 1),
-        });
-
-        return links;
-    };
-
-    // Custom pagination component
-    const ClientPagination = () => {
-        const links = generatePaginationLinks();
-
-        if (totalPages <= 1) return null;
-
-        return (
-            <div className="flex items-center justify-between px-2 py-3">
-                <div className="flex flex-1 justify-between sm:hidden">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                            currentPage > 1 && setCurrentPage(currentPage - 1)
-                        }
-                        disabled={currentPage === 1}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                            currentPage < totalPages &&
-                            setCurrentPage(currentPage + 1)
-                        }
-                        disabled={currentPage === totalPages}
-                    >
-                        Next
-                    </Button>
-                </div>
-                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                    <div>
-                        <p className="text-sm text-gray-700">
-                            Showing{" "}
-                            <span className="font-medium">{startItem}</span> to{" "}
-                            <span className="font-medium">{endItem}</span> of{" "}
-                            <span className="font-medium">
-                                {sortedUsers.length}
-                            </span>{" "}
-                            users
-                        </p>
-                    </div>
-                    <div>
-                        <nav
-                            className="isolate inline-flex -space-x-px rounded-md shadow-sm"
-                            aria-label="Pagination"
-                        >
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="rounded-l-md"
-                                disabled={currentPage === 1}
-                                onClick={() =>
-                                    currentPage > 1 &&
-                                    setCurrentPage(currentPage - 1)
-                                }
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                                <span className="sr-only">Previous</span>
-                            </Button>
-
-                            {links.slice(1, -1).map((link, i) => {
-                                // Skip the first and last items (Previous/Next buttons)
-                                if (link.label === "...") {
-                                    return (
-                                        <Button
-                                            key={`ellipsis-${i}`}
-                                            variant="outline"
-                                            size="icon"
-                                            className="cursor-default"
-                                            disabled
-                                        >
-                                            <span className="text-xs">...</span>
-                                        </Button>
-                                    );
-                                }
-
-                                return (
-                                    <Button
-                                        key={`page-${link.label}`}
-                                        variant={
-                                            link.active ? "default" : "outline"
-                                        }
-                                        size="icon"
-                                        onClick={link.onClick}
-                                    >
-                                        {link.label}
-                                    </Button>
-                                );
-                            })}
-
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="rounded-r-md"
-                                disabled={currentPage === totalPages}
-                                onClick={() =>
-                                    currentPage < totalPages &&
-                                    setCurrentPage(currentPage + 1)
-                                }
-                            >
-                                <ChevronRight className="h-4 w-4" />
-                                <span className="sr-only">Next</span>
-                            </Button>
-                        </nav>
-                    </div>
-                </div>
-            </div>
-        );
+    const handleDeleteRequest = (id: number, name: string) => {
+        setUserToDelete({ id, name });
+        setIsDeleteModalOpen(true);
     };
 
     return (
@@ -338,6 +141,16 @@ const UsersIndex = () => {
 
             {/* Breadcrumb */}
             <Breadcrumb items={[{ label: "Users" }]} />
+
+            {/* Delete User Modal */}
+            {userToDelete && (
+                <DeleteUserModal
+                    isOpen={isDeleteModalOpen}
+                    onClose={() => setIsDeleteModalOpen(false)}
+                    userId={userToDelete.id}
+                    userName={userToDelete.name}
+                />
+            )}
 
             {/* Page Header */}
             <div className="relative mb-8 overflow-hidden rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 p-8 shadow-lg">
@@ -421,13 +234,6 @@ const UsersIndex = () => {
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between text-sm">
-                    <div className="text-gray-500">
-                        Showing {startItem} to {endItem} of {sortedUsers.length}{" "}
-                        users
                     </div>
                 </div>
 
@@ -635,7 +441,7 @@ const UsersIndex = () => {
                                                                             size="sm"
                                                                             className="h-8 w-8 p-0 text-gray-500 hover:text-red-600"
                                                                             onClick={() =>
-                                                                                handleDelete(
+                                                                                handleDeleteRequest(
                                                                                     user.id,
                                                                                     user.full_name
                                                                                 )
@@ -664,7 +470,14 @@ const UsersIndex = () => {
                                 </table>
                             </div>
                         </div>
-                        <ClientPagination />
+                        {/* Using the shared ClientPagination component */}
+                        <ClientPagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalItems={sortedUsers.length}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                            setCurrentPage={setCurrentPage}
+                        />
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white py-16 text-center">

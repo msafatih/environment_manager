@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
+import { router } from "@inertiajs/react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/Components/ui/button";
 import {
@@ -21,8 +22,8 @@ import { Avatar, AvatarFallback } from "@/Components/ui/avatar";
 interface RoleEditModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onUpdateRole: (newRole: string) => void;
-    isUpdating: boolean;
+    groupId: string;
+    groupMemberId: string;
     userName: string;
     userEmail: string;
     currentRole: string;
@@ -31,13 +32,14 @@ interface RoleEditModalProps {
 const EditRoleModal = ({
     isOpen,
     onClose,
-    onUpdateRole,
-    isUpdating,
+    groupId,
+    groupMemberId,
     userName,
     userEmail,
     currentRole,
 }: RoleEditModalProps) => {
     const [selectedRole, setSelectedRole] = useState(currentRole);
+    const [isUpdating, setIsUpdating] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -56,7 +58,26 @@ const EditRoleModal = ({
 
     const handleUpdate = () => {
         if (selectedRole !== currentRole) {
-            onUpdateRole(selectedRole);
+            setIsUpdating(true);
+
+            router.put(
+                route("groups.groupMembers.update", {
+                    group: groupId,
+                    groupMember: groupMemberId,
+                }),
+                { role: selectedRole },
+                {
+                    onSuccess: () => {
+                        onClose();
+                    },
+                    onError: () => {
+                        setIsUpdating(false);
+                    },
+                    onFinish: () => {
+                        setIsUpdating(false);
+                    },
+                }
+            );
         }
     };
 

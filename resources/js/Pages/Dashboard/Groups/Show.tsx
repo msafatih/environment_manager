@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { Head, Link, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import {
-    ArrowLeft,
     Edit,
     Trash,
     Users,
@@ -43,9 +42,11 @@ import { Input } from "@/Components/ui/input";
 import type { Group, GroupMember, PageProps } from "@/types";
 import { formatDate } from "@/lib/utils";
 import EditRoleModal from "./Partials/EditRoleModal";
+import DeleteGroupMemberModal from "./Partials/DeleteGroupMemberModal";
 
 interface GroupShowProps extends PageProps {
     group: Group;
+    isAdmin: boolean;
     canCreateGroupMembers: boolean;
     canEditGroupMembers: boolean;
     canDeleteGroupMembers: boolean;
@@ -55,6 +56,7 @@ interface GroupShowProps extends PageProps {
 const GroupShow = () => {
     const {
         group,
+        isAdmin,
         canCreateGroupMembers,
         canEditGroupMembers,
         canDeleteGroupMembers,
@@ -65,60 +67,32 @@ const GroupShow = () => {
     const [memberSearchTerm, setMemberSearchTerm] = useState("");
     const [appSearchTerm, setAppSearchTerm] = useState("");
     const [isEditRoleModalOpen, setIsEditRoleModalOpen] = useState(false);
+    const [isDeleteMemberModalOpen, setIsDeleteMemberModalOpen] =
+        useState(false);
     const [selectedMember, setSelectedMember] = useState<GroupMember | null>(
         null
     );
-    const [isUpdating, setIsUpdating] = useState(false);
-
     const handleOpenEditModal = (member: GroupMember) => {
-        setSelectedMember(member);
-        setIsEditRoleModalOpen(true);
+        if (isAdmin && canEditGroupMembers) {
+            setSelectedMember(member);
+            setIsEditRoleModalOpen(true);
+        }
     };
 
     const handleCloseEditModal = () => {
-        if (!isUpdating) {
-            setIsEditRoleModalOpen(false);
-            setSelectedMember(null);
-        }
+        setIsEditRoleModalOpen(false);
+        setSelectedMember(null);
     };
 
-    const handleUpdateRole = (newRole: string) => {
-        if (!selectedMember) return;
-
-        setIsUpdating(true);
-        router.put(
-            route("groups.groupMembers.update", {
-                group: group.id,
-                groupMember: selectedMember.id,
-            }),
-            { role: newRole },
-            {
-                onSuccess: () => {
-                    handleCloseEditModal();
-                },
-                onError: () => {
-                    setIsUpdating(false);
-                },
-                onFinish: () => {
-                    setIsUpdating(false);
-                },
-            }
-        );
-    };
-
-    const handleDeleteMember = (
-        groupMember: GroupMember,
-        memberName: string
-    ) => {
-        if (
-            confirm(
-                `Are you sure you want to remove ${memberName} from this group?`
-            )
-        ) {
-            router.delete(
-                route("groups.groupMembers.destroy", [group, groupMember])
-            );
+    const handleOpenDeleteModal = (member: GroupMember) => {
+        if (canDeleteGroupMembers) {
+            setSelectedMember(member);
+            setIsDeleteMemberModalOpen(true);
         }
+    };
+    const handleCloseDeleteModal = () => {
+        setIsDeleteMemberModalOpen(false);
+        setSelectedMember(null);
     };
 
     const getRoleColor = (role: string) => {
@@ -327,9 +301,11 @@ const GroupShow = () => {
                                                     <TableHead className="font-semibold">
                                                         Added
                                                     </TableHead>
-                                                    <TableHead className="text-right font-semibold">
-                                                        Actions
-                                                    </TableHead>
+                                                    {isAdmin && (
+                                                        <TableHead className="text-right font-semibold">
+                                                            Actions
+                                                        </TableHead>
+                                                    )}
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -388,66 +364,66 @@ const GroupShow = () => {
                                                                         member.created_at
                                                                     )}
                                                                 </TableCell>
-                                                                <TableCell className="text-right">
-                                                                    <DropdownMenu>
-                                                                        <DropdownMenuTrigger
-                                                                            asChild
-                                                                        >
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                className="h-8 w-8 p-0 rounded-full"
+                                                                {isAdmin && (
+                                                                    <TableCell className="text-right">
+                                                                        <DropdownMenu>
+                                                                            <DropdownMenuTrigger
+                                                                                asChild
                                                                             >
-                                                                                <MoreHorizontal className="h-4 w-4" />
-                                                                                <span className="sr-only">
-                                                                                    Actions
-                                                                                </span>
-                                                                            </Button>
-                                                                        </DropdownMenuTrigger>
-                                                                        <DropdownMenuContent
-                                                                            align="end"
-                                                                            className="w-40"
-                                                                        >
-                                                                            {canEditGroupMembers && (
-                                                                                <DropdownMenuItem
-                                                                                    onClick={() =>
-                                                                                        handleOpenEditModal(
-                                                                                            member
-                                                                                        )
-                                                                                    }
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    className="h-8 w-8 p-0 rounded-full"
                                                                                 >
-                                                                                    <Edit className="mr-2 h-4 w-4" />
-                                                                                    <span>
-                                                                                        Edit
-                                                                                        Role
+                                                                                    <MoreHorizontal className="h-4 w-4" />
+                                                                                    <span className="sr-only">
+                                                                                        Actions
                                                                                     </span>
-                                                                                </DropdownMenuItem>
-                                                                            )}
-                                                                            {canDeleteGroupMembers && (
-                                                                                <>
-                                                                                    <DropdownMenuSeparator />
-                                                                                    <DropdownMenuItem
-                                                                                        className="text-red-600"
-                                                                                        onClick={() =>
-                                                                                            handleDeleteMember(
-                                                                                                member,
-                                                                                                member
-                                                                                                    .user
-                                                                                                    .full_name
-                                                                                            )
-                                                                                        }
-                                                                                    >
-                                                                                        <Trash className="mr-2 h-4 w-4" />
-                                                                                        <span>
-                                                                                            Remove
-                                                                                            Member
-                                                                                        </span>
-                                                                                    </DropdownMenuItem>
-                                                                                </>
-                                                                            )}
-                                                                        </DropdownMenuContent>
-                                                                    </DropdownMenu>
-                                                                </TableCell>
+                                                                                </Button>
+                                                                            </DropdownMenuTrigger>
+                                                                            <DropdownMenuContent
+                                                                                align="end"
+                                                                                className="w-40"
+                                                                            >
+                                                                                {isAdmin &&
+                                                                                    canEditGroupMembers && (
+                                                                                        <DropdownMenuItem
+                                                                                            onClick={() =>
+                                                                                                handleOpenEditModal(
+                                                                                                    member
+                                                                                                )
+                                                                                            }
+                                                                                        >
+                                                                                            <Edit className="mr-2 h-4 w-4" />
+                                                                                            <span>
+                                                                                                Edit
+                                                                                                Role
+                                                                                            </span>
+                                                                                        </DropdownMenuItem>
+                                                                                    )}
+                                                                                {canDeleteGroupMembers && (
+                                                                                    <>
+                                                                                        <DropdownMenuSeparator />
+                                                                                        <DropdownMenuItem
+                                                                                            className="text-red-600"
+                                                                                            onClick={() =>
+                                                                                                handleOpenDeleteModal(
+                                                                                                    member
+                                                                                                )
+                                                                                            }
+                                                                                        >
+                                                                                            <Trash className="mr-2 h-4 w-4" />
+                                                                                            <span>
+                                                                                                Remove
+                                                                                                Member
+                                                                                            </span>
+                                                                                        </DropdownMenuItem>
+                                                                                    </>
+                                                                                )}
+                                                                            </DropdownMenuContent>
+                                                                        </DropdownMenu>
+                                                                    </TableCell>
+                                                                )}
                                                             </TableRow>
                                                         )
                                                     )
@@ -646,23 +622,25 @@ const GroupShow = () => {
                 </TabsContent>
             </Tabs>
 
-            <div className="flex justify-center mt-8">
-                <Link href={route("groups.index")}>
-                    <Button variant="outline" className="gap-2">
-                        <ArrowLeft className="h-4 w-4" /> Back to Groups
-                    </Button>
-                </Link>
-            </div>
-
-            {selectedMember && (
+            {selectedMember && isAdmin && canEditGroupMembers && (
                 <EditRoleModal
                     isOpen={isEditRoleModalOpen}
                     onClose={handleCloseEditModal}
-                    onUpdateRole={handleUpdateRole}
-                    isUpdating={isUpdating}
+                    groupId={group.id}
+                    groupMemberId={selectedMember.id}
                     userName={selectedMember.user.full_name}
                     userEmail={selectedMember.user.email}
                     currentRole={selectedMember.role}
+                />
+            )}
+            {selectedMember && canDeleteGroupMembers && (
+                <DeleteGroupMemberModal
+                    isOpen={isDeleteMemberModalOpen}
+                    onClose={handleCloseDeleteModal}
+                    groupId={group.id}
+                    groupMemberId={selectedMember.id}
+                    memberName={selectedMember.user.full_name}
+                    memberEmail={selectedMember.user.email}
                 />
             )}
         </AuthenticatedLayout>

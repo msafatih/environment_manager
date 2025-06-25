@@ -12,8 +12,6 @@ import {
     Edit,
     Trash,
     Code,
-    ChevronLeft,
-    ChevronRight,
     FolderTree,
 } from "lucide-react";
 import { Button } from "@/Components/ui/button";
@@ -32,7 +30,7 @@ import {
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@/Components/ui/tooltip";
 import {
     Select,
     SelectContent,
@@ -40,7 +38,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/Components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@/Components/ui/skeleton";
 import {
     Dialog,
     DialogContent,
@@ -49,27 +47,28 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/Components/ui/dialog";
+// Import the shared ClientPagination component
+import ClientPagination from "@/Components/ClientPagination";
 
 interface ApplicationsPageProps extends PageProps {
     applications: Application[];
-    groupCount: number;
     canCreateApplication: boolean;
     canEditApplication: boolean;
     canDeleteApplication: boolean;
     canViewApplication: boolean;
+    isSuperAdmin: boolean;
 }
 
 const ApplicationsIndex = () => {
     const {
         applications,
-        groupCount,
         canCreateApplication,
         canEditApplication,
         canDeleteApplication,
         canViewApplication,
+        isSuperAdmin,
     } = usePage<ApplicationsPageProps>().props;
 
-    // State for client-side filtering and pagination
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [sortField, setSortField] = useState<"name" | "created_at">("name");
@@ -81,6 +80,8 @@ const ApplicationsIndex = () => {
         id: string;
         name: string;
     } | null>(null);
+
+    const ITEMS_PER_PAGE = 10;
 
     const handleDeleteRequest = (id: string, name: string) => {
         setApplicationToDelete({ id, name });
@@ -101,8 +102,6 @@ const ApplicationsIndex = () => {
         setIsDeleteModalOpen(false);
         setApplicationToDelete(null);
     };
-
-    const ITEMS_PER_PAGE = 10;
 
     // Get unique groups from applications
     const groups = useMemo(() => {
@@ -164,16 +163,8 @@ const ApplicationsIndex = () => {
         );
     }, [sortedApplications, currentPage]);
 
-    // Calculate pagination details
+    // Calculate total pages for pagination
     const totalPages = Math.ceil(sortedApplications.length / ITEMS_PER_PAGE);
-    const startItem =
-        sortedApplications.length > 0
-            ? (currentPage - 1) * ITEMS_PER_PAGE + 1
-            : 0;
-    const endItem = Math.min(
-        currentPage * ITEMS_PER_PAGE,
-        sortedApplications.length
-    );
 
     // Reset to first page when search term or group filter changes
     useEffect(() => {
@@ -190,233 +181,6 @@ const ApplicationsIndex = () => {
         }
         // Simulate loading delay
         setTimeout(() => setIsLoading(false), 300);
-    };
-
-    const handleDelete = (id: string, name: string) => {
-        if (
-            confirm(
-                `Are you sure you want to delete the application "${name}"?`
-            )
-        ) {
-            router.delete(route("applications.destroy", id));
-        }
-    };
-
-    // Generate a gradient background color based on Application name
-    const getApplicationColorGradient = (name: string) => {
-        // Simple hash function
-        const hash = name.split("").reduce((acc, char) => {
-            return char.charCodeAt(0) + ((acc << 5) - acc);
-        }, 0);
-
-        // Generate hue from hash
-        const hue = Math.abs(hash % 360);
-        return `linear-gradient(135deg, hsl(${hue}, 85%, 45%), hsl(${
-            (hue + 40) % 360
-        }, 85%, 55%))`;
-    };
-
-    // Format date for display
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-        });
-    };
-
-    // Get the first character of the application name for the icon
-    const getApplicationInitial = (name: string) => {
-        return name.charAt(0).toUpperCase();
-    };
-
-    // Generate pagination links
-    const generatePaginationLinks = () => {
-        const links = [];
-
-        // Previous button
-        links.push({
-            url: currentPage > 1 ? "#" : null,
-            label: "Previous",
-            active: false,
-            onClick: () => currentPage > 1 && setCurrentPage(currentPage - 1),
-        });
-
-        // First page
-        links.push({
-            url: "#",
-            label: "1",
-            active: currentPage === 1,
-            onClick: () => setCurrentPage(1),
-        });
-
-        // Ellipsis after first page
-        if (currentPage > 3) {
-            links.push({
-                url: null,
-                label: "...",
-                active: false,
-                onClick: () => {},
-            });
-        }
-
-        // Pages around current page
-        for (
-            let i = Math.max(2, currentPage - 1);
-            i <= Math.min(totalPages - 1, currentPage + 1);
-            i++
-        ) {
-            if (i === 1 || i === totalPages) continue; // Skip first and last page as they're added separately
-            links.push({
-                url: "#",
-                label: i.toString(),
-                active: currentPage === i,
-                onClick: () => setCurrentPage(i),
-            });
-        }
-
-        // Ellipsis before last page
-        if (currentPage < totalPages - 2) {
-            links.push({
-                url: null,
-                label: "...",
-                active: false,
-                onClick: () => {},
-            });
-        }
-
-        // Last page (if more than one page)
-        if (totalPages > 1) {
-            links.push({
-                url: "#",
-                label: totalPages.toString(),
-                active: currentPage === totalPages,
-                onClick: () => setCurrentPage(totalPages),
-            });
-        }
-
-        // Next button
-        links.push({
-            url: currentPage < totalPages ? "#" : null,
-            label: "Next",
-            active: false,
-            onClick: () =>
-                currentPage < totalPages && setCurrentPage(currentPage + 1),
-        });
-
-        return links;
-    };
-
-    // Custom pagination component
-    const ClientPagination = () => {
-        const links = generatePaginationLinks();
-
-        if (totalPages <= 1) return null;
-
-        return (
-            <div className="flex items-center justify-between px-2 py-3">
-                <div className="flex flex-1 justify-between sm:hidden">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                            currentPage > 1 && setCurrentPage(currentPage - 1)
-                        }
-                        disabled={currentPage === 1}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                            currentPage < totalPages &&
-                            setCurrentPage(currentPage + 1)
-                        }
-                        disabled={currentPage === totalPages}
-                    >
-                        Next
-                    </Button>
-                </div>
-                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                    <div>
-                        <p className="text-sm text-gray-700">
-                            Showing{" "}
-                            <span className="font-medium">{startItem}</span> to{" "}
-                            <span className="font-medium">{endItem}</span> of{" "}
-                            <span className="font-medium">
-                                {sortedApplications.length}
-                            </span>{" "}
-                            applications
-                        </p>
-                    </div>
-                    <div>
-                        <nav
-                            className="isolate inline-flex -space-x-px rounded-md shadow-sm"
-                            aria-label="Pagination"
-                        >
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="rounded-l-md"
-                                disabled={currentPage === 1}
-                                onClick={() =>
-                                    currentPage > 1 &&
-                                    setCurrentPage(currentPage - 1)
-                                }
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                                <span className="sr-only">Previous</span>
-                            </Button>
-
-                            {links.slice(1, -1).map((link, i) => {
-                                // Skip the first and last items (Previous/Next buttons)
-                                if (link.label === "...") {
-                                    return (
-                                        <Button
-                                            key={`ellipsis-${i}`}
-                                            variant="outline"
-                                            size="icon"
-                                            className="cursor-default"
-                                            disabled
-                                        >
-                                            <span className="text-xs">...</span>
-                                        </Button>
-                                    );
-                                }
-
-                                return (
-                                    <Button
-                                        key={`page-${link.label}`}
-                                        variant={
-                                            link.active ? "default" : "outline"
-                                        }
-                                        size="icon"
-                                        onClick={link.onClick}
-                                    >
-                                        {link.label}
-                                    </Button>
-                                );
-                            })}
-
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="rounded-r-md"
-                                disabled={currentPage === totalPages}
-                                onClick={() =>
-                                    currentPage < totalPages &&
-                                    setCurrentPage(currentPage + 1)
-                                }
-                            >
-                                <ChevronRight className="h-4 w-4" />
-                                <span className="sr-only">Next</span>
-                            </Button>
-                        </nav>
-                    </div>
-                </div>
-            </div>
-        );
     };
 
     return (
@@ -450,62 +214,6 @@ const ApplicationsIndex = () => {
                         )}
                     </div>
                 </div>
-
-                {/* Stats/Overview Cards */}
-                <div className="relative z-10 mt-6 grid grid-cols-2 gap-4 px-6 pb-8 sm:px-8 sm:grid-cols-4">
-                    <div className="rounded-lg bg-white/10 p-4 backdrop-blur-sm">
-                        <div className="text-sm font-medium text-white/70">
-                            Total Applications
-                        </div>
-                        <div className="mt-1 flex items-baseline">
-                            <span className="text-2xl font-semibold text-white">
-                                {applications.length}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="rounded-lg bg-white/10 p-4 backdrop-blur-sm">
-                        <div className="text-sm font-medium text-white/70">
-                            Environment Variables
-                        </div>
-                        <div className="mt-1 flex items-baseline">
-                            <span className="text-2xl font-semibold text-white">
-                                {applications.reduce(
-                                    (total, app) =>
-                                        total +
-                                        (app.env_variables?.length || 0),
-                                    0
-                                )}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="rounded-lg bg-white/10 p-4 backdrop-blur-sm">
-                        <div className="text-sm font-medium text-white/70">
-                            Access Keys
-                        </div>
-                        <div className="mt-1 flex items-baseline">
-                            <span className="text-2xl font-semibold text-white">
-                                {applications.reduce(
-                                    (total, app) =>
-                                        total + (app.access_keys?.length || 0),
-                                    0
-                                )}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="rounded-lg bg-white/10 p-4 backdrop-blur-sm">
-                        <div className="text-sm font-medium text-white/70">
-                            Groups
-                        </div>
-                        <div className="mt-1 flex items-baseline">
-                            <span className="text-2xl font-semibold text-white">
-                                {groupCount}
-                            </span>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -519,35 +227,35 @@ const ApplicationsIndex = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-
                 <div className="flex items-center gap-2">
-                    <Select
-                        value={groupFilter.toString()}
-                        onValueChange={(value) =>
-                            setGroupFilter(
-                                value === "all" ? "all" : parseInt(value)
-                            )
-                        }
-                    >
-                        <SelectTrigger className="w-[180px]">
-                            <div className="flex items-center gap-2">
-                                <FolderTree className="h-4 w-4 text-gray-500" />
-                                <SelectValue placeholder="Filter by group" />
-                            </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Groups</SelectItem>
-                            {groups.map((group) => (
-                                <SelectItem
-                                    key={group.id}
-                                    value={group.id.toString()}
-                                >
-                                    {group.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-
+                    {isSuperAdmin && (
+                        <Select
+                            value={groupFilter.toString()}
+                            onValueChange={(value) =>
+                                setGroupFilter(
+                                    value === "all" ? "all" : parseInt(value)
+                                )
+                            }
+                        >
+                            <SelectTrigger className="w-[180px]">
+                                <div className="flex items-center gap-2">
+                                    <FolderTree className="h-4 w-4 text-gray-500" />
+                                    <SelectValue placeholder="Filter by group" />
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Groups</SelectItem>
+                                {groups.map((group) => (
+                                    <SelectItem
+                                        key={group.id}
+                                        value={group.id.toString()}
+                                    >
+                                        {group.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button
@@ -670,9 +378,11 @@ const ApplicationsIndex = () => {
                                                 <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />
                                             </div>
                                         </th>
-                                        <th className="px-4 py-3 font-semibold">
-                                            Group
-                                        </th>
+                                        {isSuperAdmin && (
+                                            <th className="px-4 py-3 font-semibold">
+                                                Group
+                                            </th>
+                                        )}
                                         <th className="hidden px-4 py-3 font-semibold md:table-cell">
                                             Description
                                         </th>
@@ -745,35 +455,37 @@ const ApplicationsIndex = () => {
                                                               </div>
                                                           </div>
                                                       </td>
-                                                      <td className="px-4 py-3">
-                                                          {application.group ? (
-                                                              <Link
-                                                                  href={route(
-                                                                      "groups.show",
-                                                                      application
-                                                                          .group
-                                                                          .id
-                                                                  )}
-                                                                  className="inline-flex items-center gap-1"
-                                                              >
-                                                                  <Badge
-                                                                      variant="outline"
-                                                                      className="hover:bg-gray-100"
-                                                                  >
-                                                                      <FolderTree className="mr-1 h-3 w-3 text-gray-500" />
-                                                                      {
+                                                      {isSuperAdmin && (
+                                                          <td className="px-4 py-3">
+                                                              {application.group ? (
+                                                                  <Link
+                                                                      href={route(
+                                                                          "groups.show",
                                                                           application
                                                                               .group
-                                                                              .name
-                                                                      }
-                                                                  </Badge>
-                                                              </Link>
-                                                          ) : (
-                                                              <span className="text-gray-400 italic text-xs">
-                                                                  No group
-                                                              </span>
-                                                          )}
-                                                      </td>
+                                                                              .id
+                                                                      )}
+                                                                      className="inline-flex items-center gap-1"
+                                                                  >
+                                                                      <Badge
+                                                                          variant="outline"
+                                                                          className="hover:bg-gray-100"
+                                                                      >
+                                                                          <FolderTree className="mr-1 h-3 w-3 text-gray-500" />
+                                                                          {
+                                                                              application
+                                                                                  .group
+                                                                                  .name
+                                                                          }
+                                                                      </Badge>
+                                                                  </Link>
+                                                              ) : (
+                                                                  <span className="text-gray-400 italic text-xs">
+                                                                      No group
+                                                                  </span>
+                                                              )}
+                                                          </td>
+                                                      )}
                                                       <td className="hidden px-4 py-3 text-gray-600 md:table-cell">
                                                           {application.description ? (
                                                               <span className="line-clamp-1">
@@ -975,8 +687,14 @@ const ApplicationsIndex = () => {
                             </table>
                         </div>
                     </div>
-                    {/* Pagination */}
-                    <ClientPagination />
+                    {/* Use the imported ClientPagination component */}
+                    <ClientPagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={sortedApplications.length}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        setCurrentPage={setCurrentPage}
+                    />
                 </>
             ) : (
                 <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white py-16 text-center">

@@ -13,11 +13,12 @@ import {
     Database,
     Variable,
     AlertTriangle,
-    SortAsc,
     Code,
     Eye,
     EyeOff,
     Server,
+    ShieldAlert,
+    ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/Components/ui/button";
 import {
@@ -37,15 +38,24 @@ import {
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@/Components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/Components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 interface CreateEnvVariablesProps extends PageProps {
     application: Application;
+    canCreateDevelopment: boolean;
+    canCreateStaging: boolean;
+    canCreateProduction: boolean;
 }
 
 const EnvVariablesCreate = () => {
-    const { application } = usePage<CreateEnvVariablesProps>().props;
+    const {
+        application,
+        canCreateDevelopment,
+        canCreateStaging,
+        canCreateProduction,
+    } = usePage<CreateEnvVariablesProps>().props;
 
     const { data, setData, post, processing, errors, reset } = useForm({
         application_id: application.id.toString(),
@@ -61,6 +71,14 @@ const EnvVariablesCreate = () => {
     const [showStagingValue, setShowStagingValue] = useState(false);
     const [showDevelopmentValue, setShowDevelopmentValue] = useState(false);
 
+    // Determine initial active tab based on permissions
+    const getInitialActiveTab = () => {
+        if (canCreateProduction) return "production";
+        if (canCreateStaging) return "staging";
+        if (canCreateDevelopment) return "development";
+        return "production";
+    };
+    const [activeTab, setActiveTab] = useState(getInitialActiveTab());
     // Auto-focus name input on component mount
     useEffect(() => {
         if (nameInputRef.current) {
@@ -101,6 +119,21 @@ const EnvVariablesCreate = () => {
     const isNameValid = (name: string) => {
         const regex = /^[A-Z][A-Z0-9_]*$/;
         return regex.test(name);
+    };
+
+    // Check if at least one environment is accessible for creation
+    const hasEnvAccess =
+        canCreateDevelopment || canCreateStaging || canCreateProduction;
+
+    // Check if the form can be submitted (has valid name and at least one environment value)
+    const canSubmitForm = () => {
+        if (!data.name || !isNameValid(data.name)) return false;
+
+        return (
+            (canCreateProduction && data.production_value) ||
+            (canCreateStaging && data.staging_value) ||
+            (canCreateDevelopment && data.development_value)
+        );
     };
 
     return (
@@ -155,6 +188,18 @@ const EnvVariablesCreate = () => {
                     <CheckCircle2 className="h-4 w-4" />
                     <AlertDescription>
                         Environment variable created successfully!
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            {/* No Access Warning */}
+            {!hasEnvAccess && (
+                <Alert className="mb-6 border-amber-200 bg-amber-50 text-amber-800">
+                    <ShieldAlert className="h-4 w-4" />
+                    <AlertDescription>
+                        You don't have permission to create environment
+                        variables for any environment. Contact your
+                        administrator for access.
                     </AlertDescription>
                 </Alert>
             )}
@@ -240,7 +285,7 @@ const EnvVariablesCreate = () => {
                                             ? "border-green-300 ring-green-100"
                                             : "border-gray-300"
                                     } transition-all focus-visible:ring-blue-100 focus-visible:border-blue-500`}
-                                    disabled={processing}
+                                    disabled={processing || !hasEnvAccess}
                                 />
                                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                                     <Variable className="h-4 w-4" />
@@ -275,263 +320,327 @@ const EnvVariablesCreate = () => {
                         </div>
 
                         {/* Environment Values Tabs */}
-                        <div className="space-y-2 pt-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-sm font-medium">
-                                    Environment Values
-                                </h3>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Info className="h-4 w-4 cursor-help text-gray-400" />
-                                        </TooltipTrigger>
-                                        <TooltipContent className="bg-gray-800 text-white border-gray-700">
-                                            <p className="w-60 text-xs">
-                                                Define values for each
-                                                environment. Any sensitive data
-                                                will be encrypted.
-                                            </p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
+                        {hasEnvAccess && (
+                            <div className="space-y-2 pt-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-sm font-medium">
+                                        Environment Values
+                                    </h3>
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Info className="h-4 w-4 cursor-help text-gray-400" />
+                                            </TooltipTrigger>
+                                            <TooltipContent className="bg-gray-800 text-white border-gray-700">
+                                                <p className="w-60 text-xs">
+                                                    Define values for each
+                                                    environment. Any sensitive
+                                                    data will be encrypted.
+                                                </p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                </div>
+
+                                <Tabs
+                                    value={activeTab}
+                                    onValueChange={setActiveTab}
+                                    className="w-full"
+                                >
+                                    <TabsList
+                                        className={cn(
+                                            "grid w-full",
+                                            canCreateProduction &&
+                                                canCreateStaging &&
+                                                canCreateDevelopment
+                                                ? "grid-cols-3"
+                                                : (canCreateProduction &&
+                                                      canCreateStaging) ||
+                                                  (canCreateProduction &&
+                                                      canCreateDevelopment) ||
+                                                  (canCreateStaging &&
+                                                      canCreateDevelopment)
+                                                ? "grid-cols-2"
+                                                : "grid-cols-1"
+                                        )}
+                                    >
+                                        {canCreateDevelopment && (
+                                            <TabsTrigger
+                                                value="development"
+                                                className="flex items-center gap-1.5"
+                                            >
+                                                <Server className="h-3.5 w-3.5 text-green-600" />
+                                                <span>Development</span>
+                                            </TabsTrigger>
+                                        )}
+                                        {canCreateStaging && (
+                                            <TabsTrigger
+                                                value="staging"
+                                                className="flex items-center gap-1.5"
+                                            >
+                                                <Server className="h-3.5 w-3.5 text-amber-600" />
+                                                <span>Staging</span>
+                                            </TabsTrigger>
+                                        )}
+                                        {canCreateProduction && (
+                                            <TabsTrigger
+                                                value="production"
+                                                className="flex items-center gap-1.5"
+                                            >
+                                                <Server className="h-3.5 w-3.5 text-red-600" />
+                                                <span>Production</span>
+                                            </TabsTrigger>
+                                        )}
+                                    </TabsList>
+                                    {/* Development Value Tab */}
+                                    {canCreateDevelopment && (
+                                        <TabsContent
+                                            value="development"
+                                            className="pt-3"
+                                        >
+                                            <div className="space-y-2 border rounded-md p-4 bg-green-50/30 border-green-100">
+                                                <div className="flex items-center justify-between">
+                                                    <Label
+                                                        htmlFor="development_value"
+                                                        className="text-sm font-medium flex items-center gap-1.5"
+                                                    >
+                                                        <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                                                        Development Value
+                                                    </Label>
+                                                </div>
+                                                <div className="relative">
+                                                    <Input
+                                                        id="development_value"
+                                                        type={
+                                                            showDevelopmentValue
+                                                                ? "text"
+                                                                : "password"
+                                                        }
+                                                        placeholder="Enter development value"
+                                                        value={
+                                                            data.development_value
+                                                        }
+                                                        onChange={(e) =>
+                                                            setData(
+                                                                "development_value",
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        className={`pl-10 font-mono ${
+                                                            errors.development_value
+                                                                ? "border-red-300 ring-red-100"
+                                                                : "border-gray-300"
+                                                        } transition-all focus-visible:ring-green-100 focus-visible:border-green-500`}
+                                                        disabled={processing}
+                                                    />
+                                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                                        <Code className="h-4 w-4" />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                        onClick={() =>
+                                                            setShowDevelopmentValue(
+                                                                !showDevelopmentValue
+                                                            )
+                                                        }
+                                                    >
+                                                        {showDevelopmentValue ? (
+                                                            <EyeOff className="h-4 w-4" />
+                                                        ) : (
+                                                            <Eye className="h-4 w-4" />
+                                                        )}
+                                                    </button>
+                                                </div>
+                                                {errors.development_value ? (
+                                                    <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                                                        <span className="inline-block h-1 w-1 rounded-full bg-red-500"></span>
+                                                        {
+                                                            errors.development_value
+                                                        }
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-xs text-gray-500">
+                                                        The value used in
+                                                        development environment
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </TabsContent>
+                                    )}
+                                    {/* Staging Value Tab */}
+                                    {canCreateStaging && (
+                                        <TabsContent
+                                            value="staging"
+                                            className="pt-3"
+                                        >
+                                            <div className="space-y-2 border rounded-md p-4 bg-amber-50/30 border-amber-100">
+                                                <div className="flex items-center justify-between">
+                                                    <Label
+                                                        htmlFor="staging_value"
+                                                        className="text-sm font-medium flex items-center gap-1.5"
+                                                    >
+                                                        <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                                                        Staging Value
+                                                    </Label>
+                                                </div>
+                                                <div className="relative">
+                                                    <Input
+                                                        id="staging_value"
+                                                        type={
+                                                            showStagingValue
+                                                                ? "text"
+                                                                : "password"
+                                                        }
+                                                        placeholder="Enter staging value"
+                                                        value={
+                                                            data.staging_value
+                                                        }
+                                                        onChange={(e) =>
+                                                            setData(
+                                                                "staging_value",
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        className={`pl-10 font-mono ${
+                                                            errors.staging_value
+                                                                ? "border-red-300 ring-red-100"
+                                                                : "border-gray-300"
+                                                        } transition-all focus-visible:ring-amber-100 focus-visible:border-amber-500`}
+                                                        disabled={processing}
+                                                    />
+                                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                                        <Code className="h-4 w-4" />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                        onClick={() =>
+                                                            setShowStagingValue(
+                                                                !showStagingValue
+                                                            )
+                                                        }
+                                                    >
+                                                        {showStagingValue ? (
+                                                            <EyeOff className="h-4 w-4" />
+                                                        ) : (
+                                                            <Eye className="h-4 w-4" />
+                                                        )}
+                                                    </button>
+                                                </div>
+                                                {errors.staging_value ? (
+                                                    <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                                                        <span className="inline-block h-1 w-1 rounded-full bg-red-500"></span>
+                                                        {errors.staging_value}
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-xs text-gray-500">
+                                                        The value used in
+                                                        staging environment
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </TabsContent>
+                                    )}
+
+                                    {/* Production Value Tab */}
+                                    {canCreateProduction && (
+                                        <TabsContent
+                                            value="production"
+                                            className="pt-3"
+                                        >
+                                            <div className="space-y-2 border rounded-md p-4 bg-red-50/30 border-red-100">
+                                                <div className="flex items-center justify-between">
+                                                    <Label
+                                                        htmlFor="production_value"
+                                                        className="text-sm font-medium flex items-center gap-1.5"
+                                                    >
+                                                        <span className="h-2 w-2 rounded-full bg-red-500"></span>
+                                                        Production Value
+                                                    </Label>
+                                                </div>
+                                                <div className="relative">
+                                                    <Input
+                                                        id="production_value"
+                                                        type={
+                                                            showProductionValue
+                                                                ? "text"
+                                                                : "password"
+                                                        }
+                                                        placeholder="Enter production value"
+                                                        value={
+                                                            data.production_value
+                                                        }
+                                                        onChange={(e) =>
+                                                            setData(
+                                                                "production_value",
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        className={`pl-10 font-mono ${
+                                                            errors.production_value
+                                                                ? "border-red-300 ring-red-100"
+                                                                : "border-gray-300"
+                                                        } transition-all focus-visible:ring-red-100 focus-visible:border-red-500`}
+                                                        disabled={processing}
+                                                    />
+                                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                                        <Code className="h-4 w-4" />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                        onClick={() =>
+                                                            setShowProductionValue(
+                                                                !showProductionValue
+                                                            )
+                                                        }
+                                                    >
+                                                        {showProductionValue ? (
+                                                            <EyeOff className="h-4 w-4" />
+                                                        ) : (
+                                                            <Eye className="h-4 w-4" />
+                                                        )}
+                                                    </button>
+                                                </div>
+                                                {errors.production_value ? (
+                                                    <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                                                        <span className="inline-block h-1 w-1 rounded-full bg-red-500"></span>
+                                                        {
+                                                            errors.production_value
+                                                        }
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-xs text-gray-500">
+                                                        The value used in
+                                                        production environment
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </TabsContent>
+                                    )}
+                                </Tabs>
+
+                                {/* Environment access notes */}
+                                <div className="mt-4 flex items-center gap-2 text-sm">
+                                    <ShieldCheck className="h-4 w-4 text-indigo-500" />
+                                    <span className="text-gray-600">
+                                        You have access to create variables for:{" "}
+                                        <span className="font-medium">
+                                            {[
+                                                canCreateProduction &&
+                                                    "Production",
+                                                canCreateStaging && "Staging",
+                                                canCreateDevelopment &&
+                                                    "Development",
+                                            ]
+                                                .filter(Boolean)
+                                                .join(", ")}
+                                        </span>
+                                    </span>
+                                </div>
                             </div>
-
-                            <Tabs defaultValue="production" className="w-full">
-                                <TabsList className="grid w-full grid-cols-3">
-                                    <TabsTrigger
-                                        value="production"
-                                        className="flex items-center gap-1.5"
-                                    >
-                                        <Server className="h-3.5 w-3.5 text-red-600" />
-                                        <span>Production</span>
-                                    </TabsTrigger>
-                                    <TabsTrigger
-                                        value="staging"
-                                        className="flex items-center gap-1.5"
-                                    >
-                                        <Server className="h-3.5 w-3.5 text-amber-600" />
-                                        <span>Staging</span>
-                                    </TabsTrigger>
-                                    <TabsTrigger
-                                        value="development"
-                                        className="flex items-center gap-1.5"
-                                    >
-                                        <Server className="h-3.5 w-3.5 text-green-600" />
-                                        <span>Development</span>
-                                    </TabsTrigger>
-                                </TabsList>
-
-                                {/* Production Value Tab */}
-                                <TabsContent
-                                    value="production"
-                                    className="pt-3"
-                                >
-                                    <div className="space-y-2 border rounded-md p-4 bg-red-50/30 border-red-100">
-                                        <div className="flex items-center justify-between">
-                                            <Label
-                                                htmlFor="production_value"
-                                                className="text-sm font-medium flex items-center gap-1.5"
-                                            >
-                                                <span className="h-2 w-2 rounded-full bg-red-500"></span>
-                                                Production Value
-                                            </Label>
-                                        </div>
-                                        <div className="relative">
-                                            <Input
-                                                id="production_value"
-                                                type={
-                                                    showProductionValue
-                                                        ? "text"
-                                                        : "password"
-                                                }
-                                                placeholder="Enter production value"
-                                                value={data.production_value}
-                                                onChange={(e) =>
-                                                    setData(
-                                                        "production_value",
-                                                        e.target.value
-                                                    )
-                                                }
-                                                className={`pl-10 font-mono ${
-                                                    errors.production_value
-                                                        ? "border-red-300 ring-red-100"
-                                                        : "border-gray-300"
-                                                } transition-all focus-visible:ring-red-100 focus-visible:border-red-500`}
-                                                disabled={processing}
-                                            />
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                                                <Code className="h-4 w-4" />
-                                            </div>
-                                            <button
-                                                type="button"
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                onClick={() =>
-                                                    setShowProductionValue(
-                                                        !showProductionValue
-                                                    )
-                                                }
-                                            >
-                                                {showProductionValue ? (
-                                                    <EyeOff className="h-4 w-4" />
-                                                ) : (
-                                                    <Eye className="h-4 w-4" />
-                                                )}
-                                            </button>
-                                        </div>
-                                        {errors.production_value ? (
-                                            <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                                                <span className="inline-block h-1 w-1 rounded-full bg-red-500"></span>
-                                                {errors.production_value}
-                                            </p>
-                                        ) : (
-                                            <p className="text-xs text-gray-500">
-                                                The value used in production
-                                                environment
-                                            </p>
-                                        )}
-                                    </div>
-                                </TabsContent>
-
-                                {/* Staging Value Tab */}
-                                <TabsContent value="staging" className="pt-3">
-                                    <div className="space-y-2 border rounded-md p-4 bg-amber-50/30 border-amber-100">
-                                        <div className="flex items-center justify-between">
-                                            <Label
-                                                htmlFor="staging_value"
-                                                className="text-sm font-medium flex items-center gap-1.5"
-                                            >
-                                                <span className="h-2 w-2 rounded-full bg-amber-500"></span>
-                                                Staging Value
-                                            </Label>
-                                        </div>
-                                        <div className="relative">
-                                            <Input
-                                                id="staging_value"
-                                                type={
-                                                    showStagingValue
-                                                        ? "text"
-                                                        : "password"
-                                                }
-                                                placeholder="Enter staging value"
-                                                value={data.staging_value}
-                                                onChange={(e) =>
-                                                    setData(
-                                                        "staging_value",
-                                                        e.target.value
-                                                    )
-                                                }
-                                                className={`pl-10 font-mono ${
-                                                    errors.staging_value
-                                                        ? "border-red-300 ring-red-100"
-                                                        : "border-gray-300"
-                                                } transition-all focus-visible:ring-amber-100 focus-visible:border-amber-500`}
-                                                disabled={processing}
-                                            />
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                                                <Code className="h-4 w-4" />
-                                            </div>
-                                            <button
-                                                type="button"
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                onClick={() =>
-                                                    setShowStagingValue(
-                                                        !showStagingValue
-                                                    )
-                                                }
-                                            >
-                                                {showStagingValue ? (
-                                                    <EyeOff className="h-4 w-4" />
-                                                ) : (
-                                                    <Eye className="h-4 w-4" />
-                                                )}
-                                            </button>
-                                        </div>
-                                        {errors.staging_value ? (
-                                            <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                                                <span className="inline-block h-1 w-1 rounded-full bg-red-500"></span>
-                                                {errors.staging_value}
-                                            </p>
-                                        ) : (
-                                            <p className="text-xs text-gray-500">
-                                                The value used in staging
-                                                environment
-                                            </p>
-                                        )}
-                                    </div>
-                                </TabsContent>
-
-                                {/* Development Value Tab */}
-                                <TabsContent
-                                    value="development"
-                                    className="pt-3"
-                                >
-                                    <div className="space-y-2 border rounded-md p-4 bg-green-50/30 border-green-100">
-                                        <div className="flex items-center justify-between">
-                                            <Label
-                                                htmlFor="development_value"
-                                                className="text-sm font-medium flex items-center gap-1.5"
-                                            >
-                                                <span className="h-2 w-2 rounded-full bg-green-500"></span>
-                                                Development Value
-                                            </Label>
-                                        </div>
-                                        <div className="relative">
-                                            <Input
-                                                id="development_value"
-                                                type={
-                                                    showDevelopmentValue
-                                                        ? "text"
-                                                        : "password"
-                                                }
-                                                placeholder="Enter development value"
-                                                value={data.development_value}
-                                                onChange={(e) =>
-                                                    setData(
-                                                        "development_value",
-                                                        e.target.value
-                                                    )
-                                                }
-                                                className={`pl-10 font-mono ${
-                                                    errors.development_value
-                                                        ? "border-red-300 ring-red-100"
-                                                        : "border-gray-300"
-                                                } transition-all focus-visible:ring-green-100 focus-visible:border-green-500`}
-                                                disabled={processing}
-                                            />
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                                                <Code className="h-4 w-4" />
-                                            </div>
-                                            <button
-                                                type="button"
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                onClick={() =>
-                                                    setShowDevelopmentValue(
-                                                        !showDevelopmentValue
-                                                    )
-                                                }
-                                            >
-                                                {showDevelopmentValue ? (
-                                                    <EyeOff className="h-4 w-4" />
-                                                ) : (
-                                                    <Eye className="h-4 w-4" />
-                                                )}
-                                            </button>
-                                        </div>
-                                        {errors.development_value ? (
-                                            <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                                                <span className="inline-block h-1 w-1 rounded-full bg-red-500"></span>
-                                                {errors.development_value}
-                                            </p>
-                                        ) : (
-                                            <p className="text-xs text-gray-500">
-                                                The value used in development
-                                                environment
-                                            </p>
-                                        )}
-                                    </div>
-                                </TabsContent>
-                            </Tabs>
-                        </div>
+                        )}
                     </CardContent>
 
                     <CardFooter className="flex justify-end gap-3 border-t bg-gray-50/80 px-6 py-4">
@@ -548,9 +657,7 @@ const EnvVariablesCreate = () => {
                         <Button
                             type="submit"
                             disabled={
-                                processing ||
-                                !data.name ||
-                                !isNameValid(data.name)
+                                processing || !hasEnvAccess || !canSubmitForm()
                             }
                             className="gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-sm"
                         >

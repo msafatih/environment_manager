@@ -14,6 +14,7 @@ import {
 import { useState, useEffect } from "react";
 import SidebarItem from "./SidebarItem";
 import SidebarSection from "./SidebarSection";
+import { PageProps } from "@/types";
 
 interface SidebarProps {
     sidebarOpen: boolean;
@@ -21,23 +22,65 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ sidebarOpen, toggleSidebar }: SidebarProps) => {
-    const { url } = usePage();
+    const { url, props } = usePage<PageProps>();
+    const { auth } = props;
     const [activeSection, setActiveSection] = useState<string | null>(null);
 
+    console.log(
+        "Sidebar rendered with auth:",
+        auth.user.roles.find((role) => role.name === "super-admin")
+    );
+    const can = (permission: string): boolean => {
+        if (!auth.user) {
+            return false;
+        }
+        if (
+            auth?.user?.permissions?.some(
+                (p) => p.permission?.name === permission
+            )
+        ) {
+            return true;
+        }
+        if (auth?.user?.roles) {
+            return auth.user.roles.some(
+                (role) =>
+                    role?.permissions &&
+                    role.permissions.some((p) => p?.name === permission)
+            );
+        }
+        return false;
+    };
+
     useEffect(() => {
-        if (route().current("dashboard") || route().current("groups.*")) {
-            setActiveSection("environments");
+        if (route().current("dashboard")) {
+            setActiveSection("dashboard");
         } else if (
             route().current("groups.*") ||
             route().current("applications.*") ||
-            route().current("groups.*") ||
-            route().current("groups.*")
+            route().current("envValueChanges.*")
+        ) {
+            setActiveSection("environments");
+        } else if (
+            route().current("users.*") ||
+            route().current("roles.*") ||
+            route().current("permissions.*")
         ) {
             setActiveSection("access");
         } else {
             setActiveSection(null);
         }
     }, [url]);
+
+    // Check if any menu items in a section are visible
+    const isEnvironmentSectionVisible =
+        can("view-any-groups") ||
+        can("view-any-applications") ||
+        can("view-any-env-value-changes");
+
+    const isAccessManagementSectionVisible =
+        can("view-any-users") ||
+        can("view-any-roles") ||
+        can("view-any-permissions");
 
     return (
         <aside
@@ -66,56 +109,77 @@ const Sidebar = ({ sidebarOpen, toggleSidebar }: SidebarProps) => {
             {/* Sidebar content with custom scrollbar */}
             <div className="custom-scrollbar flex flex-col h-[calc(100%-4rem)] overflow-y-auto py-4">
                 <nav className="space-y-0.5 px-3 flex-grow">
-                    {/* Dashboard */}
-                    <SidebarItem
-                        href="dashboard"
-                        icon={Home}
-                        text="Dashboard"
-                        isActive={route().current("dashboard")}
-                    />
+                    {/* Dashboard - show if user has permission */}
+                    {can("view-dashboard") && (
+                        <SidebarItem
+                            href="dashboard"
+                            icon={Home}
+                            text="Dashboard"
+                            isActive={route().current("dashboard")}
+                        />
+                    )}
 
                     {/* Environments Section */}
-                    <SidebarSection title="Environments">
-                        <SidebarItem
-                            href="groups.index"
-                            icon={FolderTree}
-                            text="Groups"
-                            isActive={route().current("groups.*")}
-                        />
-                        <SidebarItem
-                            href="applications.index"
-                            icon={Tags}
-                            text="Applications"
-                            isActive={route().current("applications.*")}
-                        />
-                        <SidebarItem
-                            href="envValueChanges.index"
-                            icon={ShieldAlert}
-                            text="Environment Value Changes"
-                            isActive={route().current("envValueChanges.*")}
-                        />
-                    </SidebarSection>
+                    {isEnvironmentSectionVisible && (
+                        <SidebarSection title="Environments">
+                            {can("view-any-groups") && (
+                                <SidebarItem
+                                    href="groups.index"
+                                    icon={FolderTree}
+                                    text="Groups"
+                                    isActive={route().current("groups.*")}
+                                />
+                            )}
+                            {can("view-any-applications") && (
+                                <SidebarItem
+                                    href="applications.index"
+                                    icon={Tags}
+                                    text="Applications"
+                                    isActive={route().current("applications.*")}
+                                />
+                            )}
+                            {can("view-any-env-value-changes") && (
+                                <SidebarItem
+                                    href="envValueChanges.index"
+                                    icon={ShieldAlert}
+                                    text="Environment Value Changes"
+                                    isActive={route().current(
+                                        "envValueChanges.*"
+                                    )}
+                                />
+                            )}
+                        </SidebarSection>
+                    )}
 
-                    <SidebarSection title="Access Management">
-                        <SidebarItem
-                            href="users.index"
-                            icon={Users}
-                            text="Users"
-                            isActive={route().current("users.*")}
-                        />
-                        <SidebarItem
-                            href="roles.index"
-                            icon={Shield}
-                            text="Roles"
-                            isActive={route().current("roles.*")}
-                        />
-                        <SidebarItem
-                            href="permissions.index"
-                            icon={Guard}
-                            text="Permissions"
-                            isActive={route().current("permissions.*")}
-                        />
-                    </SidebarSection>
+                    {/* Access Management Section */}
+                    {isAccessManagementSectionVisible && (
+                        <SidebarSection title="Access Management">
+                            {can("view-any-users") && (
+                                <SidebarItem
+                                    href="users.index"
+                                    icon={Users}
+                                    text="Users"
+                                    isActive={route().current("users.*")}
+                                />
+                            )}
+                            {can("view-any-roles") && (
+                                <SidebarItem
+                                    href="roles.index"
+                                    icon={Shield}
+                                    text="Roles"
+                                    isActive={route().current("roles.*")}
+                                />
+                            )}
+                            {can("view-any-permissions") && (
+                                <SidebarItem
+                                    href="permissions.index"
+                                    icon={Guard}
+                                    text="Permissions"
+                                    isActive={route().current("permissions.*")}
+                                />
+                            )}
+                        </SidebarSection>
+                    )}
                 </nav>
 
                 <div className="mt-auto border-t border-indigo-800/70 p-4">

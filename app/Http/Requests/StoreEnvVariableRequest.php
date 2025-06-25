@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Application;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 
@@ -14,7 +15,10 @@ class StoreEnvVariableRequest extends FormRequest
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        return $user->can('create-env-variables');
+        $application = $this->route('application');
+
+        return $user->can('create-env-variables') ||
+            ($application && $user->can('create-env-variables-' . $application->slug));
     }
 
     /**
@@ -24,13 +28,24 @@ class StoreEnvVariableRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            //
-            'name' => 'required|string|max:255',
+        $rules = [
+            'name' => 'required|string|max:255|regex:/^[A-Z][A-Z0-9_]*$/',
             'application_id' => 'required|exists:applications,id',
             'production_value' => 'nullable|string',
             'staging_value' => 'nullable|string',
             'development_value' => 'nullable|string',
+
+        ];
+        return $rules;
+    }
+
+    /**
+     * Get custom validation messages
+     */
+    public function messages(): array
+    {
+        return [
+            'name.regex' => 'Variable name must start with an uppercase letter and contain only uppercase letters, numbers, and underscores.',
         ];
     }
 }

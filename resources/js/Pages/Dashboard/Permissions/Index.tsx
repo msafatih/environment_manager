@@ -1,12 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { useState, useEffect, useMemo } from "react";
+import { Head, usePage } from "@inertiajs/react";
 import type { Permission, PageProps } from "@/types";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import {
-    ChevronLeft,
-    ChevronRight,
     Search,
     Plus,
     Lock,
@@ -15,23 +13,13 @@ import {
     Filter,
     ArrowUpDown,
     SlidersHorizontal,
-    Shield,
-    Loader2,
-    Save,
-    X,
     LockKeyhole,
 } from "lucide-react";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
 import { Badge } from "@/Components/ui/badge";
 import { Breadcrumb } from "@/Components/Breadcrumb";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/Components/ui/card";
+import { Card, CardHeader } from "@/Components/ui/card";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -47,16 +35,13 @@ import {
     TableHeader,
     TableRow,
 } from "@/Components/ui/table";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/Components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import ClientPagination from "@/Components/ClientPagination";
+
+// Import modals
+import CreatePermissionModal from "./Partials/CreatePermissionModal";
+import EditPermissionModal from "./Partials/EditPermissionModal";
+import DeletePermissionModal from "./Partials/DeletePermissionModal";
 
 interface PermissionsIndexProps extends PageProps {
     permissions: Permission[];
@@ -73,28 +58,23 @@ const PermissionsIndex = () => {
         canDeletePermissions,
     } = usePage<PermissionsIndexProps>().props;
 
-    // Permission creation modal state
+    // State for modals
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [permissionName, setPermissionName] = useState("");
-    const [guardName, setGuardName] = useState("web");
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [formError, setFormError] = useState("");
-    const inputRef = useRef<HTMLInputElement>(null);
 
-    // Permission edit modal state
+    // Edit permission modal state
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editPermissionId, setEditPermissionId] = useState<number | null>(
         null
     );
     const [editPermissionName, setEditPermissionName] = useState("");
-    const [editGuardName, setEditGuardName] = useState("");
-    const [editPermissionOriginalName, setEditPermissionOriginalName] =
-        useState("");
-    const [editPermissionOriginalGuard, setEditPermissionOriginalGuard] =
-        useState("");
-    const [isEditSubmitting, setIsEditSubmitting] = useState(false);
-    const [editFormError, setEditFormError] = useState("");
-    const editInputRef = useRef<HTMLInputElement>(null);
+    const [editPermissionGuard, setEditPermissionGuard] = useState("");
+
+    // Delete permission modal state
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [deletePermissionId, setDeletePermissionId] = useState<number | null>(
+        null
+    );
+    const [deletePermissionName, setDeletePermissionName] = useState("");
 
     // State for client-side filtering and pagination
     const [searchTerm, setSearchTerm] = useState("");
@@ -106,114 +86,19 @@ const PermissionsIndex = () => {
 
     const ITEMS_PER_PAGE = 10;
 
-    // Focus on the input field when create modal opens
-    useEffect(() => {
-        if (isCreateModalOpen && inputRef.current) {
-            setTimeout(() => {
-                inputRef.current?.focus();
-            }, 100);
-        }
-    }, [isCreateModalOpen]);
-
-    // Focus on the input field when edit modal opens
-    useEffect(() => {
-        if (isEditModalOpen && editInputRef.current) {
-            setTimeout(() => {
-                editInputRef.current?.focus();
-            }, 100);
-        }
-    }, [isEditModalOpen]);
-
-    // Handle permission creation submission
-    const handleCreatePermission = () => {
-        if (!permissionName.trim()) {
-            setFormError("Permission name is required");
-            return;
-        }
-
-        setIsSubmitting(true);
-        setFormError("");
-
-        router.post(
-            route("permissions.store"),
-            { name: permissionName, guard_name: guardName },
-            {
-                onSuccess: () => {
-                    setIsCreateModalOpen(false);
-                    setPermissionName("");
-                    setGuardName("web");
-                    setIsSubmitting(false);
-                },
-                onError: (errors) => {
-                    setIsSubmitting(false);
-                    if (errors.name) {
-                        setFormError(errors.name);
-                    } else if (errors.guard_name) {
-                        setFormError(errors.guard_name);
-                    } else {
-                        setFormError("An error occurred. Please try again.");
-                    }
-                },
-            }
-        );
-    };
-
     // Open edit modal with permission data
     const openEditModal = (permission: Permission) => {
         setEditPermissionId(permission.id);
         setEditPermissionName(permission.name);
-        setEditGuardName(permission.guard_name);
-        setEditPermissionOriginalName(permission.name);
-        setEditPermissionOriginalGuard(permission.guard_name);
-        setEditFormError("");
+        setEditPermissionGuard(permission.guard_name);
         setIsEditModalOpen(true);
     };
 
-    // Handle permission edit submission
-    const handleEditPermission = () => {
-        if (!editPermissionName.trim()) {
-            setEditFormError("Permission name is required");
-            return;
-        }
-
-        if (
-            editPermissionName === editPermissionOriginalName &&
-            editGuardName === editPermissionOriginalGuard
-        ) {
-            setIsEditModalOpen(false);
-            return;
-        }
-
-        setIsEditSubmitting(true);
-        setEditFormError("");
-
-        router.put(
-            route("permissions.update", editPermissionId?.toString()),
-            { name: editPermissionName, guard_name: editGuardName },
-            {
-                onSuccess: () => {
-                    setIsEditModalOpen(false);
-                    setEditPermissionId(null);
-                    setEditPermissionName("");
-                    setEditGuardName("");
-                    setEditPermissionOriginalName("");
-                    setEditPermissionOriginalGuard("");
-                    setIsEditSubmitting(false);
-                },
-                onError: (errors) => {
-                    setIsEditSubmitting(false);
-                    if (errors.name) {
-                        setEditFormError(errors.name);
-                    } else if (errors.guard_name) {
-                        setEditFormError(errors.guard_name);
-                    } else {
-                        setEditFormError(
-                            "An error occurred. Please try again."
-                        );
-                    }
-                },
-            }
-        );
+    // Open delete modal with permission data
+    const openDeleteModal = (id: number, name: string) => {
+        setDeletePermissionId(id);
+        setDeletePermissionName(name);
+        setIsDeleteModalOpen(true);
     };
 
     // Client-side filtering
@@ -256,16 +141,8 @@ const PermissionsIndex = () => {
         return sortedPermissions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }, [sortedPermissions, currentPage]);
 
-    // Calculate pagination details
+    // Calculate total pages for pagination
     const totalPages = Math.ceil(sortedPermissions.length / ITEMS_PER_PAGE);
-    const startItem =
-        sortedPermissions.length > 0
-            ? (currentPage - 1) * ITEMS_PER_PAGE + 1
-            : 0;
-    const endItem = Math.min(
-        currentPage * ITEMS_PER_PAGE,
-        sortedPermissions.length
-    );
 
     // Reset to first page when search term changes
     useEffect(() => {
@@ -278,14 +155,6 @@ const PermissionsIndex = () => {
         } else {
             setSortField(field);
             setSortDirection("asc");
-        }
-    };
-
-    const handleDelete = (id: number, name: string) => {
-        if (
-            confirm(`Are you sure you want to delete the permission "${name}"?`)
-        ) {
-            router.delete(route("permissions.destroy", id));
         }
     };
 
@@ -386,201 +255,33 @@ const PermissionsIndex = () => {
         );
     };
 
-    // Generate pagination links
-    const generatePaginationLinks = () => {
-        const links = [];
-
-        // Previous button
-        links.push({
-            url: currentPage > 1 ? "#" : null,
-            label: "Previous",
-            active: false,
-            onClick: () => currentPage > 1 && setCurrentPage(currentPage - 1),
-        });
-
-        // First page
-        links.push({
-            url: "#",
-            label: "1",
-            active: currentPage === 1,
-            onClick: () => setCurrentPage(1),
-        });
-
-        // Ellipsis after first page
-        if (currentPage > 3) {
-            links.push({
-                url: null,
-                label: "...",
-                active: false,
-                onClick: () => {},
-            });
-        }
-
-        // Pages around current page
-        for (
-            let i = Math.max(2, currentPage - 1);
-            i <= Math.min(totalPages - 1, currentPage + 1);
-            i++
-        ) {
-            if (i === 1 || i === totalPages) continue; // Skip first and last page as they're added separately
-            links.push({
-                url: "#",
-                label: i.toString(),
-                active: currentPage === i,
-                onClick: () => setCurrentPage(i),
-            });
-        }
-
-        // Ellipsis before last page
-        if (currentPage < totalPages - 2) {
-            links.push({
-                url: null,
-                label: "...",
-                active: false,
-                onClick: () => {},
-            });
-        }
-
-        // Last page (if more than one page)
-        if (totalPages > 1) {
-            links.push({
-                url: "#",
-                label: totalPages.toString(),
-                active: currentPage === totalPages,
-                onClick: () => setCurrentPage(totalPages),
-            });
-        }
-
-        // Next button
-        links.push({
-            url: currentPage < totalPages ? "#" : null,
-            label: "Next",
-            active: false,
-            onClick: () =>
-                currentPage < totalPages && setCurrentPage(currentPage + 1),
-        });
-
-        return links;
-    };
-
-    // Custom pagination component
-    const ClientPagination = () => {
-        const links = generatePaginationLinks();
-
-        if (totalPages <= 1) return null;
-
-        return (
-            <div className="flex items-center justify-between px-2 py-3">
-                <div className="flex flex-1 justify-between sm:hidden">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                            currentPage > 1 && setCurrentPage(currentPage - 1)
-                        }
-                        disabled={currentPage === 1}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                            currentPage < totalPages &&
-                            setCurrentPage(currentPage + 1)
-                        }
-                        disabled={currentPage === totalPages}
-                    >
-                        Next
-                    </Button>
-                </div>
-                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                    <div>
-                        <p className="text-sm text-gray-700">
-                            Showing{" "}
-                            <span className="font-medium">{startItem}</span> to{" "}
-                            <span className="font-medium">{endItem}</span> of{" "}
-                            <span className="font-medium">
-                                {sortedPermissions.length}
-                            </span>{" "}
-                            permissions
-                        </p>
-                    </div>
-                    <div>
-                        <nav
-                            className="isolate inline-flex -space-x-px rounded-md shadow-sm"
-                            aria-label="Pagination"
-                        >
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="rounded-l-md"
-                                disabled={currentPage === 1}
-                                onClick={() =>
-                                    currentPage > 1 &&
-                                    setCurrentPage(currentPage - 1)
-                                }
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                                <span className="sr-only">Previous</span>
-                            </Button>
-
-                            {links.slice(1, -1).map((link, i) => {
-                                // Skip the first and last items (Previous/Next buttons)
-                                if (link.label === "...") {
-                                    return (
-                                        <Button
-                                            key={`ellipsis-${i}`}
-                                            variant="outline"
-                                            size="icon"
-                                            className="cursor-default"
-                                            disabled
-                                        >
-                                            <span className="text-xs">...</span>
-                                        </Button>
-                                    );
-                                }
-
-                                return (
-                                    <Button
-                                        key={`page-${link.label}`}
-                                        variant={
-                                            link.active ? "default" : "outline"
-                                        }
-                                        size="icon"
-                                        onClick={link.onClick}
-                                    >
-                                        {link.label}
-                                    </Button>
-                                );
-                            })}
-
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="rounded-r-md"
-                                disabled={currentPage === totalPages}
-                                onClick={() =>
-                                    currentPage < totalPages &&
-                                    setCurrentPage(currentPage + 1)
-                                }
-                            >
-                                <ChevronRight className="h-4 w-4" />
-                                <span className="sr-only">Next</span>
-                            </Button>
-                        </nav>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
     return (
         <AuthenticatedLayout>
             <Head title="Permissions" />
 
             {/* Breadcrumb */}
             <Breadcrumb items={[{ label: "Permissions" }]} />
+
+            {/* Modals */}
+            <CreatePermissionModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+            />
+
+            <EditPermissionModal
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                permissionId={editPermissionId}
+                permissionName={editPermissionName}
+                permissionGuard={editPermissionGuard}
+            />
+
+            <DeletePermissionModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                permissionId={deletePermissionId}
+                permissionName={deletePermissionName}
+            />
 
             {/* Header Banner */}
             <div className="relative mb-8 overflow-hidden rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 shadow-lg">
@@ -655,241 +356,6 @@ const PermissionsIndex = () => {
                     </div>
                 </div>
             </div>
-
-            {/* Create Permission Modal */}
-            <Dialog
-                open={isCreateModalOpen}
-                onOpenChange={setIsCreateModalOpen}
-            >
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Lock className="h-5 w-5 text-emerald-600" />
-                            Create Permission
-                        </DialogTitle>
-                        <DialogDescription>
-                            Define a new permission for your application.
-                            Permissions control what actions users can perform.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid gap-2">
-                            <Label
-                                htmlFor="permission-name"
-                                className="text-sm font-medium"
-                            >
-                                Permission Name{" "}
-                                <span className="text-red-500">*</span>
-                            </Label>
-                            <Input
-                                id="permission-name"
-                                ref={inputRef}
-                                placeholder="e.g., create-users, view-reports"
-                                value={permissionName}
-                                onChange={(e) => {
-                                    setPermissionName(e.target.value);
-                                    setFormError("");
-                                }}
-                                className={
-                                    formError && formError.includes("name")
-                                        ? "border-red-300 focus-visible:ring-red-200"
-                                        : ""
-                                }
-                                disabled={isSubmitting}
-                            />
-                            <p className="text-xs text-gray-500">
-                                Use format: action-resource (e.g., create-users)
-                            </p>
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label
-                                htmlFor="guard-name"
-                                className="text-sm font-medium"
-                            >
-                                Guard <span className="text-red-500">*</span>
-                            </Label>
-                            <select
-                                id="guard-name"
-                                value={guardName}
-                                onChange={(e) => {
-                                    setGuardName(e.target.value);
-                                    setFormError("");
-                                }}
-                                className={cn(
-                                    "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-                                    formError && formError.includes("guard")
-                                        ? "border-red-300 focus-visible:ring-red-200"
-                                        : ""
-                                )}
-                                disabled={isSubmitting}
-                            >
-                                <option value="web">Web</option>
-                                <option value="api">API</option>
-                                <option value="sanctum">Sanctum</option>
-                            </select>
-                        </div>
-
-                        {formError && (
-                            <p className="text-xs text-red-600">{formError}</p>
-                        )}
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setIsCreateModalOpen(false);
-                                setPermissionName("");
-                                setGuardName("web");
-                                setFormError("");
-                            }}
-                            disabled={isSubmitting}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleCreatePermission}
-                            disabled={isSubmitting || !permissionName.trim()}
-                            className="gap-2"
-                        >
-                            {isSubmitting ? (
-                                <>
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    Creating...
-                                </>
-                            ) : (
-                                <>
-                                    <Plus className="h-4 w-4" />
-                                    Create Permission
-                                </>
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Edit Permission Modal */}
-            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Lock className="h-5 w-5 text-emerald-600" />
-                            Edit Permission
-                        </DialogTitle>
-                        <DialogDescription>
-                            Update the permission name or guard. Be careful as
-                            this may affect existing roles and users.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid gap-2">
-                            <Label
-                                htmlFor="edit-permission-name"
-                                className="text-sm font-medium"
-                            >
-                                Permission Name{" "}
-                                <span className="text-red-500">*</span>
-                            </Label>
-                            <Input
-                                id="edit-permission-name"
-                                ref={editInputRef}
-                                placeholder="e.g., create-users, view-reports"
-                                value={editPermissionName}
-                                onChange={(e) => {
-                                    setEditPermissionName(e.target.value);
-                                    setEditFormError("");
-                                }}
-                                className={
-                                    editFormError &&
-                                    editFormError.includes("name")
-                                        ? "border-red-300 focus-visible:ring-red-200"
-                                        : ""
-                                }
-                                disabled={isEditSubmitting}
-                            />
-                            <p className="text-xs text-gray-500">
-                                Use format: action-resource (e.g., create-users)
-                            </p>
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label
-                                htmlFor="edit-guard-name"
-                                className="text-sm font-medium"
-                            >
-                                Guard <span className="text-red-500">*</span>
-                            </Label>
-                            <select
-                                id="edit-guard-name"
-                                value={editGuardName}
-                                onChange={(e) => {
-                                    setEditGuardName(e.target.value);
-                                    setEditFormError("");
-                                }}
-                                className={cn(
-                                    "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-                                    editFormError &&
-                                        editFormError.includes("guard")
-                                        ? "border-red-300 focus-visible:ring-red-200"
-                                        : ""
-                                )}
-                                disabled={isEditSubmitting}
-                            >
-                                <option value="web">Web</option>
-                                <option value="api">API</option>
-                                <option value="sanctum">Sanctum</option>
-                            </select>
-                        </div>
-
-                        {editFormError && (
-                            <p className="text-xs text-red-600">
-                                {editFormError}
-                            </p>
-                        )}
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setIsEditModalOpen(false);
-                                setEditPermissionId(null);
-                                setEditPermissionName("");
-                                setEditGuardName("");
-                                setEditPermissionOriginalName("");
-                                setEditPermissionOriginalGuard("");
-                                setEditFormError("");
-                            }}
-                            disabled={isEditSubmitting}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleEditPermission}
-                            disabled={
-                                isEditSubmitting ||
-                                !editPermissionName.trim() ||
-                                (editPermissionName ===
-                                    editPermissionOriginalName &&
-                                    editGuardName ===
-                                        editPermissionOriginalGuard)
-                            }
-                            className="gap-2"
-                        >
-                            {isEditSubmitting ? (
-                                <>
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    Saving...
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="h-4 w-4" />
-                                    Save Changes
-                                </>
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
 
             {/* Main Content */}
             <Card className="shadow-sm border-gray-200">
@@ -1139,7 +605,7 @@ const PermissionsIndex = () => {
                                                         variant="outline"
                                                         className="h-8 border-red-200 text-red-600 hover:bg-red-50 gap-1"
                                                         onClick={() =>
-                                                            handleDelete(
+                                                            openDeleteModal(
                                                                 permission.id,
                                                                 permission.name
                                                             )
@@ -1162,7 +628,13 @@ const PermissionsIndex = () => {
 
                 {paginatedPermissions.length > 0 && (
                     <div className="border-t">
-                        <ClientPagination />
+                        <ClientPagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalItems={sortedPermissions.length}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                            setCurrentPage={setCurrentPage}
+                        />
                     </div>
                 )}
             </Card>

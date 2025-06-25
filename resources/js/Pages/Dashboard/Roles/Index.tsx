@@ -1,12 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { useState, useMemo } from "react";
+import { Head, Link, usePage } from "@inertiajs/react";
 import type { Role, PageProps } from "@/types";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import {
-    ChevronLeft,
-    ChevronRight,
     Search,
     Plus,
     Shield,
@@ -17,8 +15,6 @@ import {
     ArrowUpDown,
     SlidersHorizontal,
     Lock,
-    Loader2,
-    Save,
 } from "lucide-react";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
@@ -40,16 +36,11 @@ import {
     TableHeader,
     TableRow,
 } from "@/Components/ui/table";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/Components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import ClientPagination from "@/Components/ClientPagination";
+import CreateRoleModal from "./Partials/CreateRoleModal";
+import EditRoleModal from "./Partials/EditRoleModal";
+import DeleteRoleModal from "./Partials/DeleteRoleModal";
 
 interface RolesIndexProps extends PageProps {
     roles: Role[];
@@ -70,19 +61,16 @@ const RolesIndex = () => {
 
     // Role creation modal state
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [roleName, setRoleName] = useState("");
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [formError, setFormError] = useState("");
-    const inputRef = useRef<HTMLInputElement>(null);
 
     // Role edit modal state
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editRoleId, setEditRoleId] = useState<number | null>(null);
     const [editRoleName, setEditRoleName] = useState("");
-    const [editRoleOriginalName, setEditRoleOriginalName] = useState("");
-    const [isEditSubmitting, setIsEditSubmitting] = useState(false);
-    const [editFormError, setEditFormError] = useState("");
-    const editInputRef = useRef<HTMLInputElement>(null);
+
+    // Role delete modal state
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [deleteRoleId, setDeleteRoleId] = useState("");
+    const [deleteRoleName, setDeleteRoleName] = useState("");
 
     // State for client-side filtering and pagination
     const [searchTerm, setSearchTerm] = useState("");
@@ -94,101 +82,18 @@ const RolesIndex = () => {
 
     const ITEMS_PER_PAGE = 10;
 
-    // Focus on the input field when create modal opens
-    useEffect(() => {
-        if (isCreateModalOpen && inputRef.current) {
-            setTimeout(() => {
-                inputRef.current?.focus();
-            }, 100);
-        }
-    }, [isCreateModalOpen]);
-
-    // Focus on the input field when edit modal opens
-    useEffect(() => {
-        if (isEditModalOpen && editInputRef.current) {
-            setTimeout(() => {
-                editInputRef.current?.focus();
-            }, 100);
-        }
-    }, [isEditModalOpen]);
-
-    // Handle role creation submission
-    const handleCreateRole = () => {
-        if (!roleName.trim()) {
-            setFormError("Role name is required");
-            return;
-        }
-
-        setIsSubmitting(true);
-        setFormError("");
-
-        router.post(
-            route("roles.store"),
-            { name: roleName },
-            {
-                onSuccess: () => {
-                    setIsCreateModalOpen(false);
-                    setRoleName("");
-                    setIsSubmitting(false);
-                },
-                onError: (errors) => {
-                    setIsSubmitting(false);
-                    if (errors.name) {
-                        setFormError(errors.name);
-                    } else {
-                        setFormError("An error occurred. Please try again.");
-                    }
-                },
-            }
-        );
-    };
-
     // Open edit modal with role data
     const openEditModal = (role: Role) => {
         setEditRoleId(Number(role.id));
         setEditRoleName(role.name);
-        setEditRoleOriginalName(role.name);
-        setEditFormError("");
         setIsEditModalOpen(true);
     };
 
-    const handleEditRole = () => {
-        if (!editRoleName.trim()) {
-            setEditFormError("Role name is required");
-            return;
-        }
-
-        if (editRoleName === editRoleOriginalName) {
-            setIsEditModalOpen(false);
-            return;
-        }
-
-        setIsEditSubmitting(true);
-        setEditFormError("");
-
-        router.put(
-            route("roles.update", editRoleId!.toString()),
-            { name: editRoleName },
-            {
-                onSuccess: () => {
-                    setIsEditModalOpen(false);
-                    setEditRoleId(null);
-                    setEditRoleName("");
-                    setEditRoleOriginalName("");
-                    setIsEditSubmitting(false);
-                },
-                onError: (errors) => {
-                    setIsEditSubmitting(false);
-                    if (errors.name) {
-                        setEditFormError(errors.name);
-                    } else {
-                        setEditFormError(
-                            "An error occurred. Please try again."
-                        );
-                    }
-                },
-            }
-        );
+    // Open delete modal with role data
+    const openDeleteModal = (id: string, name: string) => {
+        setDeleteRoleId(id);
+        setDeleteRoleName(name);
+        setIsDeleteModalOpen(true);
     };
 
     // Client-side filtering
@@ -227,16 +132,8 @@ const RolesIndex = () => {
         return sortedRoles.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }, [sortedRoles, currentPage]);
 
-    // Calculate pagination details
+    // Calculate total pages for pagination
     const totalPages = Math.ceil(sortedRoles.length / ITEMS_PER_PAGE);
-    const startItem =
-        sortedRoles.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0;
-    const endItem = Math.min(currentPage * ITEMS_PER_PAGE, sortedRoles.length);
-
-    // Reset to first page when search term changes
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchTerm]);
 
     const handleSort = (field: "name" | "guard_name" | "created_at") => {
         if (sortField === field) {
@@ -244,12 +141,6 @@ const RolesIndex = () => {
         } else {
             setSortField(field);
             setSortDirection("asc");
-        }
-    };
-
-    const handleDelete = (id: string, name: string) => {
-        if (confirm(`Are you sure you want to delete the role "${name}"?`)) {
-            router.delete(route("roles.destroy", id));
         }
     };
 
@@ -280,201 +171,32 @@ const RolesIndex = () => {
         });
     };
 
-    // Generate pagination links
-    const generatePaginationLinks = () => {
-        const links = [];
-
-        // Previous button
-        links.push({
-            url: currentPage > 1 ? "#" : null,
-            label: "Previous",
-            active: false,
-            onClick: () => currentPage > 1 && setCurrentPage(currentPage - 1),
-        });
-
-        // First page
-        links.push({
-            url: "#",
-            label: "1",
-            active: currentPage === 1,
-            onClick: () => setCurrentPage(1),
-        });
-
-        // Ellipsis after first page
-        if (currentPage > 3) {
-            links.push({
-                url: null,
-                label: "...",
-                active: false,
-                onClick: () => {},
-            });
-        }
-
-        // Pages around current page
-        for (
-            let i = Math.max(2, currentPage - 1);
-            i <= Math.min(totalPages - 1, currentPage + 1);
-            i++
-        ) {
-            if (i === 1 || i === totalPages) continue; // Skip first and last page as they're added separately
-            links.push({
-                url: "#",
-                label: i.toString(),
-                active: currentPage === i,
-                onClick: () => setCurrentPage(i),
-            });
-        }
-
-        // Ellipsis before last page
-        if (currentPage < totalPages - 2) {
-            links.push({
-                url: null,
-                label: "...",
-                active: false,
-                onClick: () => {},
-            });
-        }
-
-        // Last page (if more than one page)
-        if (totalPages > 1) {
-            links.push({
-                url: "#",
-                label: totalPages.toString(),
-                active: currentPage === totalPages,
-                onClick: () => setCurrentPage(totalPages),
-            });
-        }
-
-        // Next button
-        links.push({
-            url: currentPage < totalPages ? "#" : null,
-            label: "Next",
-            active: false,
-            onClick: () =>
-                currentPage < totalPages && setCurrentPage(currentPage + 1),
-        });
-
-        return links;
-    };
-
-    // Custom pagination component
-    const ClientPagination = () => {
-        const links = generatePaginationLinks();
-
-        if (totalPages <= 1) return null;
-
-        return (
-            <div className="flex items-center justify-between px-2 py-3">
-                <div className="flex flex-1 justify-between sm:hidden">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                            currentPage > 1 && setCurrentPage(currentPage - 1)
-                        }
-                        disabled={currentPage === 1}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                            currentPage < totalPages &&
-                            setCurrentPage(currentPage + 1)
-                        }
-                        disabled={currentPage === totalPages}
-                    >
-                        Next
-                    </Button>
-                </div>
-                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                    <div>
-                        <p className="text-sm text-gray-700">
-                            Showing{" "}
-                            <span className="font-medium">{startItem}</span> to{" "}
-                            <span className="font-medium">{endItem}</span> of{" "}
-                            <span className="font-medium">
-                                {sortedRoles.length}
-                            </span>{" "}
-                            roles
-                        </p>
-                    </div>
-                    <div>
-                        <nav
-                            className="isolate inline-flex -space-x-px rounded-md shadow-sm"
-                            aria-label="Pagination"
-                        >
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="rounded-l-md"
-                                disabled={currentPage === 1}
-                                onClick={() =>
-                                    currentPage > 1 &&
-                                    setCurrentPage(currentPage - 1)
-                                }
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                                <span className="sr-only">Previous</span>
-                            </Button>
-
-                            {links.slice(1, -1).map((link, i) => {
-                                // Skip the first and last items (Previous/Next buttons)
-                                if (link.label === "...") {
-                                    return (
-                                        <Button
-                                            key={`ellipsis-${i}`}
-                                            variant="outline"
-                                            size="icon"
-                                            className="cursor-default"
-                                            disabled
-                                        >
-                                            <span className="text-xs">...</span>
-                                        </Button>
-                                    );
-                                }
-
-                                return (
-                                    <Button
-                                        key={`page-${link.label}`}
-                                        variant={
-                                            link.active ? "default" : "outline"
-                                        }
-                                        size="icon"
-                                        onClick={link.onClick}
-                                    >
-                                        {link.label}
-                                    </Button>
-                                );
-                            })}
-
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="rounded-r-md"
-                                disabled={currentPage === totalPages}
-                                onClick={() =>
-                                    currentPage < totalPages &&
-                                    setCurrentPage(currentPage + 1)
-                                }
-                            >
-                                <ChevronRight className="h-4 w-4" />
-                                <span className="sr-only">Next</span>
-                            </Button>
-                        </nav>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
     return (
         <AuthenticatedLayout>
             <Head title="User Roles" />
 
             {/* Breadcrumb */}
             <Breadcrumb items={[{ label: "Roles" }]} />
+
+            {/* Modals */}
+            <CreateRoleModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+            />
+
+            <EditRoleModal
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                roleId={editRoleId}
+                roleName={editRoleName}
+            />
+
+            <DeleteRoleModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                roleId={deleteRoleId}
+                roleName={deleteRoleName}
+            />
 
             <div className="relative mb-8 overflow-hidden rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 shadow-lg">
                 <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,#fff,rgba(255,255,255,0.7))]"></div>
@@ -564,170 +286,6 @@ const RolesIndex = () => {
                     </div>
                 </div>
             </div>
-
-            {/* Create Role Modal */}
-            <Dialog
-                open={isCreateModalOpen}
-                onOpenChange={setIsCreateModalOpen}
-            >
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Shield className="h-5 w-5 text-indigo-600" />
-                            Create New Role
-                        </DialogTitle>
-                        <DialogDescription>
-                            Enter a name for the new role. Click save when
-                            you're done.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid gap-2">
-                            <Label
-                                htmlFor="role-name"
-                                className="text-sm font-medium"
-                            >
-                                Role Name{" "}
-                                <span className="text-red-500">*</span>
-                            </Label>
-                            <Input
-                                id="role-name"
-                                ref={inputRef}
-                                placeholder="Enter role name"
-                                value={roleName}
-                                onChange={(e) => {
-                                    setRoleName(e.target.value);
-                                    setFormError("");
-                                }}
-                                className={
-                                    formError
-                                        ? "border-red-300 focus-visible:ring-red-200"
-                                        : ""
-                                }
-                                disabled={isSubmitting}
-                            />
-                            {formError && (
-                                <p className="text-xs text-red-600">
-                                    {formError}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setIsCreateModalOpen(false);
-                                setRoleName("");
-                                setFormError("");
-                            }}
-                            disabled={isSubmitting}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleCreateRole}
-                            disabled={isSubmitting || !roleName.trim()}
-                            className="gap-2"
-                        >
-                            {isSubmitting ? (
-                                <>
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    Creating...
-                                </>
-                            ) : (
-                                <>
-                                    <Plus className="h-4 w-4" />
-                                    Create Role
-                                </>
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Edit Role Modal */}
-            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Shield className="h-5 w-5 text-indigo-600" />
-                            Edit Role
-                        </DialogTitle>
-                        <DialogDescription>
-                            Update the role name. Click save when you're done.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid gap-2">
-                            <Label
-                                htmlFor="edit-role-name"
-                                className="text-sm font-medium"
-                            >
-                                Role Name{" "}
-                                <span className="text-red-500">*</span>
-                            </Label>
-                            <Input
-                                id="edit-role-name"
-                                ref={editInputRef}
-                                placeholder="Enter role name"
-                                value={editRoleName}
-                                onChange={(e) => {
-                                    setEditRoleName(e.target.value);
-                                    setEditFormError("");
-                                }}
-                                className={
-                                    editFormError
-                                        ? "border-red-300 focus-visible:ring-red-200"
-                                        : ""
-                                }
-                                disabled={isEditSubmitting}
-                            />
-                            {editFormError && (
-                                <p className="text-xs text-red-600">
-                                    {editFormError}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setIsEditModalOpen(false);
-                                setEditRoleId(null);
-                                setEditRoleName("");
-                                setEditRoleOriginalName("");
-                                setEditFormError("");
-                            }}
-                            disabled={isEditSubmitting}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleEditRole}
-                            disabled={
-                                isEditSubmitting ||
-                                !editRoleName.trim() ||
-                                editRoleName === editRoleOriginalName
-                            }
-                            className="gap-2"
-                        >
-                            {isEditSubmitting ? (
-                                <>
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    Saving...
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="h-4 w-4" />
-                                    Save Changes
-                                </>
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
 
             {/* Main Content */}
             <Card className="shadow-sm border-gray-200">
@@ -1005,7 +563,7 @@ const RolesIndex = () => {
                                                             variant="outline"
                                                             className="h-8 border-red-200 text-red-600 hover:bg-red-50 gap-1"
                                                             onClick={() =>
-                                                                handleDelete(
+                                                                openDeleteModal(
                                                                     role.id,
                                                                     role.name
                                                                 )
@@ -1028,7 +586,13 @@ const RolesIndex = () => {
 
                 {paginatedRoles.length > 0 && (
                     <div className="border-t">
-                        <ClientPagination />
+                        <ClientPagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalItems={sortedRoles.length}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                            setCurrentPage={setCurrentPage}
+                        />
                     </div>
                 )}
             </Card>

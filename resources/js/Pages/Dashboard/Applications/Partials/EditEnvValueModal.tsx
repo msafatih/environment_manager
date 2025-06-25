@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { router } from "@inertiajs/react";
 import { Check } from "lucide-react";
 import {
@@ -27,15 +27,15 @@ export default function EditEnvValueModal({
     envValue,
     applicationId,
 }: EditEnvValueModalProps) {
-    const [editedValue, setEditedValue] = useState(envValue?.value || "");
+    const [editedValue, setEditedValue] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // When the envValue changes (e.g. when opening dialog with different value), update state
-    useState(() => {
+    // Reset the editedValue whenever the envValue changes
+    useEffect(() => {
         if (envValue) {
-            setEditedValue(envValue.value);
+            setEditedValue(envValue.value || "");
         }
-    });
+    }, [envValue]);
 
     const handleSaveEnvValue = () => {
         if (!envValue) return;

@@ -19,7 +19,6 @@ Route::prefix('dashboard')->group(function () {
     Route::get('/', function () {
         return Inertia::render('Dashboard/Index');
     })->name('dashboard');
-
     Route::resource('groups', GroupController::class);
     Route::resource('applications', ApplicationController::class);
     Route::get('applications/{application}/export', [ApplicationController::class, 'export'])

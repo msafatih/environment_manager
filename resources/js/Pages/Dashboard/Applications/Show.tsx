@@ -61,7 +61,7 @@ import {
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@/Components/ui/tooltip";
 import { ArrowDownUp, ArrowDown, ArrowUp } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import EditEnvValueModal from "./Partials/EditEnvValueModal";
@@ -73,9 +73,12 @@ interface ApplicationsShowProps extends PageProps {
     canEditEnvVariables: boolean;
     canCreateEnvVariables: boolean;
     canDeleteEnvVariables: boolean;
-    canEditAccessKeys: boolean;
-    canCreateAccessKeys: boolean;
-    canDeleteAccessKeys: boolean;
+    canViewDevelopment: boolean;
+    canEditDevelopment: boolean;
+    canViewStaging: boolean;
+    canEditStaging: boolean;
+    canViewProduction: boolean;
+    canEditProduction: boolean;
     canEditEnvValues: boolean;
     canViewEnvValueChanges: boolean;
 }
@@ -86,6 +89,12 @@ const ApplicationsShow = () => {
         canEditEnvVariables,
         canCreateEnvVariables,
         canDeleteEnvVariables,
+        canViewDevelopment,
+        canEditDevelopment,
+        canViewStaging,
+        canEditStaging,
+        canViewProduction,
+        canEditProduction,
         canEditEnvValues,
         canViewEnvValueChanges,
     } = usePage<ApplicationsShowProps>().props;
@@ -498,14 +507,16 @@ const ApplicationsShow = () => {
                                                             <span>Staging</span>
                                                         </div>
                                                     </TableHead>
-                                                    <TableHead className="min-w-[180px]">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <Globe className="h-3.5 w-3.5 text-red-500" />
-                                                            <span>
-                                                                Production
-                                                            </span>
-                                                        </div>
-                                                    </TableHead>
+                                                    {canViewProduction && (
+                                                        <TableHead className="min-w-[180px]">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <Globe className="h-3.5 w-3.5 text-red-500" />
+                                                                <span>
+                                                                    Production
+                                                                </span>
+                                                            </div>
+                                                        </TableHead>
+                                                    )}
 
                                                     <TableHead
                                                         className="w-[150px] min-w-[150px] cursor-pointer"
@@ -564,12 +575,14 @@ const ApplicationsShow = () => {
                                                                     "staging"
                                                                 )}
                                                             </TableCell>
-                                                            <TableCell>
-                                                                {renderEnvValue(
-                                                                    variable,
-                                                                    "production"
-                                                                )}
-                                                            </TableCell>
+                                                            {canViewProduction && (
+                                                                <TableCell>
+                                                                    {renderEnvValue(
+                                                                        variable,
+                                                                        "production"
+                                                                    )}
+                                                                </TableCell>
+                                                            )}
                                                             <TableCell className="text-sm text-gray-600">
                                                                 {formatDate(
                                                                     variable.created_at
@@ -614,17 +627,19 @@ const ApplicationsShow = () => {
                                                                                     Variable
                                                                                 </DropdownMenuItem>
                                                                             )}
-                                                                            <DropdownMenuItem
-                                                                                onClick={() =>
-                                                                                    handleViewHistory(
-                                                                                        variable
-                                                                                    )
-                                                                                }
-                                                                            >
-                                                                                <History className="h-4 w-4 mr-2" />
-                                                                                View
-                                                                                History
-                                                                            </DropdownMenuItem>
+                                                                            {canViewEnvValueChanges && (
+                                                                                <DropdownMenuItem
+                                                                                    onClick={() =>
+                                                                                        handleViewHistory(
+                                                                                            variable
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    <History className="h-4 w-4 mr-2" />
+                                                                                    View
+                                                                                    History
+                                                                                </DropdownMenuItem>
+                                                                            )}
                                                                             {canDeleteEnvVariables && (
                                                                                 <>
                                                                                     <DropdownMenuSeparator />
@@ -857,15 +872,17 @@ const ApplicationsShow = () => {
                 />
             )}
 
-            <DeleteEnvVariableModal
-                isOpen={isDeleteDialogOpen}
-                onClose={() => {
-                    setIsDeleteDialogOpen(false);
-                    setDeletingVariable(null);
-                }}
-                envVariable={deletingVariable}
-                applicationId={application.id}
-            />
+            {canDeleteEnvVariables && (
+                <DeleteEnvVariableModal
+                    isOpen={isDeleteDialogOpen}
+                    onClose={() => {
+                        setIsDeleteDialogOpen(false);
+                        setDeletingVariable(null);
+                    }}
+                    envVariable={deletingVariable}
+                    applicationId={application.id}
+                />
+            )}
         </AuthenticatedLayout>
     );
 };

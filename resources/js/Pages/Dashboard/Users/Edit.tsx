@@ -34,7 +34,7 @@ import {
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@/Components/ui/tooltip";
 import { PageProps, User } from "@/types";
 
 interface ProfileEditPageProps extends PageProps {

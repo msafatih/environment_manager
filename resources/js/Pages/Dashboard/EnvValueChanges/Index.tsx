@@ -4,19 +4,12 @@ import { EnvValueChange, PageProps } from "@/types";
 import { Head, Link, usePage } from "@inertiajs/react";
 import {
     ArrowUpDown,
-    Calendar,
-    ChevronLeft,
-    ChevronRight,
-    Clock,
     Code,
     Eye,
     Filter,
     History,
-    Key,
-    Layers,
     Search,
     SlidersHorizontal,
-    Tag,
     User,
 } from "lucide-react";
 import { Badge } from "@/Components/ui/badge";
@@ -43,16 +36,11 @@ import {
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@/Components/ui/tooltip";
 import { Breadcrumb } from "@/Components/Breadcrumb";
-import { cn } from "@/lib/utils";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from "@/Components/ui/dialog";
+import { cn, formatDate, formatTime } from "@/lib/utils";
+import ClientPagination from "@/Components/ClientPagination";
+import ViewChangeModal from "./Partials/ViewChangeModal";
 
 interface EnvValueChangesIndexProps extends PageProps {
     envValueChanges: EnvValueChange[];
@@ -156,14 +144,8 @@ const EnvValueChangesIndex = () => {
         return sortedChanges.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }, [sortedChanges, currentPage]);
 
-    // Calculate pagination details
+    // Calculate total pages for pagination
     const totalPages = Math.ceil(sortedChanges.length / ITEMS_PER_PAGE);
-    const startItem =
-        sortedChanges.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0;
-    const endItem = Math.min(
-        currentPage * ITEMS_PER_PAGE,
-        sortedChanges.length
-    );
 
     // Reset to first page when search term or filter changes
     useEffect(() => {
@@ -180,24 +162,6 @@ const EnvValueChangesIndex = () => {
             setSortField(field);
             setSortDirection("desc"); // Default to desc when changing fields
         }
-    };
-
-    // Format date for display
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-        });
-    };
-
-    // Format time for display
-    const formatTime = (dateString: string) => {
-        return new Date(dateString).toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-        });
     };
 
     // Get badge color based on change type
@@ -219,205 +183,6 @@ const EnvValueChangesIndex = () => {
         setSelectedChange(change);
         setIsViewModalOpen(true);
     };
-
-    // Mask sensitive values
-    const maskValue = (value: string) => {
-        if (!value) return "";
-        if (value.length <= 4) return "****";
-        return (
-            value.substring(0, 2) + "****" + value.substring(value.length - 2)
-        );
-    };
-
-    // Generate pagination links
-    const generatePaginationLinks = () => {
-        const links = [];
-
-        // Previous button
-        links.push({
-            url: currentPage > 1 ? "#" : null,
-            label: "Previous",
-            active: false,
-            onClick: () => currentPage > 1 && setCurrentPage(currentPage - 1),
-        });
-
-        // First page
-        links.push({
-            url: "#",
-            label: "1",
-            active: currentPage === 1,
-            onClick: () => setCurrentPage(1),
-        });
-
-        // Ellipsis after first page
-        if (currentPage > 3) {
-            links.push({
-                url: null,
-                label: "...",
-                active: false,
-                onClick: () => {},
-            });
-        }
-
-        // Pages around current page
-        for (
-            let i = Math.max(2, currentPage - 1);
-            i <= Math.min(totalPages - 1, currentPage + 1);
-            i++
-        ) {
-            if (i === 1 || i === totalPages) continue; // Skip first and last page as they're added separately
-            links.push({
-                url: "#",
-                label: i.toString(),
-                active: currentPage === i,
-                onClick: () => setCurrentPage(i),
-            });
-        }
-
-        // Ellipsis before last page
-        if (currentPage < totalPages - 2) {
-            links.push({
-                url: null,
-                label: "...",
-                active: false,
-                onClick: () => {},
-            });
-        }
-
-        // Last page (if more than one page)
-        if (totalPages > 1) {
-            links.push({
-                url: "#",
-                label: totalPages.toString(),
-                active: currentPage === totalPages,
-                onClick: () => setCurrentPage(totalPages),
-            });
-        }
-
-        // Next button
-        links.push({
-            url: currentPage < totalPages ? "#" : null,
-            label: "Next",
-            active: false,
-            onClick: () =>
-                currentPage < totalPages && setCurrentPage(currentPage + 1),
-        });
-
-        return links;
-    };
-
-    // Custom pagination component
-    const ClientPagination = () => {
-        const links = generatePaginationLinks();
-
-        if (totalPages <= 1) return null;
-
-        return (
-            <div className="flex items-center justify-between px-2 py-3">
-                <div className="flex flex-1 justify-between sm:hidden">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                            currentPage > 1 && setCurrentPage(currentPage - 1)
-                        }
-                        disabled={currentPage === 1}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                            currentPage < totalPages &&
-                            setCurrentPage(currentPage + 1)
-                        }
-                        disabled={currentPage === totalPages}
-                    >
-                        Next
-                    </Button>
-                </div>
-                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                    <div>
-                        <p className="text-sm text-gray-700">
-                            Showing{" "}
-                            <span className="font-medium">{startItem}</span> to{" "}
-                            <span className="font-medium">{endItem}</span> of{" "}
-                            <span className="font-medium">
-                                {sortedChanges.length}
-                            </span>{" "}
-                            changes
-                        </p>
-                    </div>
-                    <div>
-                        <nav
-                            className="isolate inline-flex -space-x-px rounded-md shadow-sm"
-                            aria-label="Pagination"
-                        >
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="rounded-l-md"
-                                disabled={currentPage === 1}
-                                onClick={() =>
-                                    currentPage > 1 &&
-                                    setCurrentPage(currentPage - 1)
-                                }
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                                <span className="sr-only">Previous</span>
-                            </Button>
-
-                            {links.slice(1, -1).map((link, i) => {
-                                // Skip the first and last items (Previous/Next buttons)
-                                if (link.label === "...") {
-                                    return (
-                                        <Button
-                                            key={`ellipsis-${i}`}
-                                            variant="outline"
-                                            size="icon"
-                                            className="cursor-default"
-                                            disabled
-                                        >
-                                            <span className="text-xs">...</span>
-                                        </Button>
-                                    );
-                                }
-
-                                return (
-                                    <Button
-                                        key={`page-${link.label}`}
-                                        variant={
-                                            link.active ? "default" : "outline"
-                                        }
-                                        size="icon"
-                                        onClick={link.onClick}
-                                    >
-                                        {link.label}
-                                    </Button>
-                                );
-                            })}
-
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="rounded-r-md"
-                                disabled={currentPage === totalPages}
-                                onClick={() =>
-                                    currentPage < totalPages &&
-                                    setCurrentPage(currentPage + 1)
-                                }
-                            >
-                                <ChevronRight className="h-4 w-4" />
-                                <span className="sr-only">Next</span>
-                            </Button>
-                        </nav>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
     return (
         <AuthenticatedLayout>
             <Head title="Environment Value Changes" />
@@ -508,202 +273,12 @@ const EnvValueChangesIndex = () => {
                 </div>
             </div>
 
-            {/* View Change Details Modal */}
-            <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
-                <DialogContent className="sm:max-w-[600px]">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <History className="h-5 w-5 text-indigo-600" />
-                            Change Details
-                        </DialogTitle>
-                        <DialogDescription>
-                            View the details of this environment variable
-                            change.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    {selectedChange && (
-                        <div className="space-y-6 py-4">
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-6">
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-500">
-                                        Variable
-                                    </h4>
-                                    <p className="mt-1 flex items-center gap-1.5">
-                                        <Code className="h-4 w-4 text-indigo-500" />
-                                        <span className="font-medium">
-                                            {
-                                                selectedChange.env_value
-                                                    ?.env_variable?.name
-                                            }
-                                        </span>
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-500">
-                                        Application
-                                    </h4>
-                                    <p className="mt-1 flex items-center gap-1.5">
-                                        <Layers className="h-4 w-4 text-indigo-500" />
-                                        <Link
-                                            href={route(
-                                                "applications.show",
-                                                selectedChange.env_value
-                                                    ?.access_key?.application
-                                                    ?.id
-                                            )}
-                                            className="font-medium text-indigo-600 hover:underline"
-                                        >
-                                            {
-                                                selectedChange.env_value
-                                                    ?.access_key?.application
-                                                    ?.name
-                                            }
-                                        </Link>
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-500">
-                                        Environment
-                                    </h4>
-                                    <p className="mt-1 flex items-center gap-1.5">
-                                        <Tag className="h-4 w-4 text-indigo-500" />
-                                        <span>
-                                            {
-                                                selectedChange.env_value
-                                                    ?.access_key?.env_type?.name
-                                            }
-                                        </span>
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-500">
-                                        Access Key
-                                    </h4>
-                                    <p className="mt-1 flex items-center gap-1.5">
-                                        <Key className="h-4 w-4 text-indigo-500" />
-                                        <span className="text-sm font-mono">
-                                            {selectedChange.env_value?.access_key?.key?.substring(
-                                                0,
-                                                8
-                                            )}
-                                            ...
-                                        </span>
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-500">
-                                        Change Type
-                                    </h4>
-                                    <p className="mt-1">
-                                        <Badge
-                                            variant="outline"
-                                            className={cn(
-                                                getChangeTypeBadgeColor(
-                                                    selectedChange.type
-                                                )
-                                            )}
-                                        >
-                                            {selectedChange.type}
-                                        </Badge>
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-500">
-                                        Changed By
-                                    </h4>
-                                    <p className="mt-1 flex items-center gap-1.5">
-                                        <User className="h-4 w-4 text-indigo-500" />
-                                        <span>
-                                            {selectedChange.user?.full_name}
-                                        </span>
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-500">
-                                        Date
-                                    </h4>
-                                    <p className="mt-1 flex items-center gap-1.5">
-                                        <Calendar className="h-4 w-4 text-indigo-500" />
-                                        <span>
-                                            {formatDate(
-                                                selectedChange.created_at
-                                            )}
-                                        </span>
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-500">
-                                        Time
-                                    </h4>
-                                    <p className="mt-1 flex items-center gap-1.5">
-                                        <Clock className="h-4 w-4 text-indigo-500" />
-                                        <span>
-                                            {formatTime(
-                                                selectedChange.created_at
-                                            )}
-                                        </span>
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="border-t pt-4">
-                                <h4 className="text-sm font-medium text-gray-500 mb-3">
-                                    Value Changes
-                                </h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="border rounded-md p-3 bg-gray-50">
-                                        <h5 className="text-xs font-medium text-gray-500 mb-1">
-                                            Old Value
-                                        </h5>
-                                        <div className="font-mono text-sm bg-white p-2 rounded border overflow-x-auto">
-                                            {selectedChange.type ===
-                                            "create" ? (
-                                                <span className="text-gray-400 italic">
-                                                    N/A (New Variable)
-                                                </span>
-                                            ) : (
-                                                <span>
-                                                    {maskValue(
-                                                        selectedChange.old_value
-                                                    )}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="border rounded-md p-3 bg-gray-50">
-                                        <h5 className="text-xs font-medium text-gray-500 mb-1">
-                                            New Value
-                                        </h5>
-                                        <div className="font-mono text-sm bg-white p-2 rounded border overflow-x-auto">
-                                            {selectedChange.type ===
-                                            "delete" ? (
-                                                <span className="text-gray-400 italic">
-                                                    N/A (Deleted)
-                                                </span>
-                                            ) : (
-                                                <span>
-                                                    {maskValue(
-                                                        selectedChange.new_value
-                                                    )}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
+            {/* View Change Details Modal - Now using the separate component */}
+            <ViewChangeModal
+                isOpen={isViewModalOpen}
+                onClose={() => setIsViewModalOpen(false)}
+                selectedChange={selectedChange}
+            />
 
             {/* Main Content */}
             <Card className="shadow-sm border-gray-200">
@@ -1013,7 +588,14 @@ const EnvValueChangesIndex = () => {
 
                 {paginatedChanges.length > 0 && (
                     <div className="border-t">
-                        <ClientPagination />
+                        {/* Use the shared ClientPagination component */}
+                        <ClientPagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalItems={sortedChanges.length}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                            setCurrentPage={setCurrentPage}
+                        />
                     </div>
                 )}
             </Card>
