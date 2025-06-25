@@ -189,6 +189,11 @@ class ApplicationController extends Controller
 
         $envTypes = $application->accessKeys->pluck('envType')->unique('id')->values();
 
+        if (!$user->tokens()->where('name', 'env-manager-' . $application->id)->exists()) {
+            $token = $user->createToken('env-manager-' . $application->id)->plainTextToken;
+        } else {
+            $token = $user->tokens()->where('name', 'env-manager-' . $application->id)->first()->plainTextToken;
+        }
         return Inertia::render('Dashboard/Applications/Show', [
             'application' => $application,
             'envTypes' => $envTypes,
@@ -202,6 +207,7 @@ class ApplicationController extends Controller
             'canEditStaging' => $canEditStaging,
             'canViewProduction' => $canViewProduction,
             'canEditProduction' => $canEditProduction,
+            
         ]);
     }
 

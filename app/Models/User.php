@@ -7,13 +7,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasPermissions;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles, HasPermissions;
+    use HasFactory, Notifiable, HasRoles, HasPermissions, HasApiTokens;
     protected $table = 'users';
 
     /**
@@ -26,6 +27,7 @@ class User extends Authenticatable
         'email',
         'password',
     ];
+    protected $appends = ['api_token'];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -58,5 +60,11 @@ class User extends Authenticatable
     public function envValueChanges(): HasMany
     {
         return $this->hasMany(EnvValueChange::class, 'user_id', 'id');
+    }
+
+    public function getApiTokenAttribute()
+    {
+        $token = $this->tokens()->latest()->first();
+        return $token ? explode('|', $token->token)[1] : null;
     }
 }

@@ -66,6 +66,7 @@ import { ArrowDownUp, ArrowDown, ArrowUp } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import EditEnvValueModal from "./Partials/EditEnvValueModal";
 import DeleteEnvVariableModal from "./Partials/DeleteEnvVariableModal";
+import DownloadEnvModal from "./Partials/DownloadEnvModal";
 
 interface ApplicationsShowProps extends PageProps {
     application: Application;
@@ -112,6 +113,7 @@ const ApplicationsShow = () => {
     const [sortDirection, setSortDirection] = useState("asc");
     const [deletingVariable, setDeletingVariable] = useState<any>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
 
     const filteredEnvVariables =
         application.env_variables
@@ -408,19 +410,16 @@ const ApplicationsShow = () => {
                                         </Link>
                                     )}
 
-                                    <a
-                                        href={route("applications.export", {
-                                            application: application.id,
-                                        })}
+                                    <Button
+                                        variant="outline"
+                                        className="gap-1.5 border-green-500 bg-white text-green-700 hover:bg-green-50"
+                                        onClick={() =>
+                                            setIsDownloadDialogOpen(true)
+                                        }
                                     >
-                                        <Button
-                                            variant="outline"
-                                            className="gap-1.5 border-green-500 bg-white text-green-700 hover:bg-green-50"
-                                        >
-                                            <DownloadIcon className="h-4 w-4" />
-                                            Export Variables
-                                        </Button>
-                                    </a>
+                                        <DownloadIcon className="h-4 w-4" />
+                                        Download .env
+                                    </Button>
                                 </div>
                             </div>
                         </CardHeader>
@@ -883,6 +882,16 @@ const ApplicationsShow = () => {
                     applicationId={application.id}
                 />
             )}
+            <DownloadEnvModal
+                isOpen={isDownloadDialogOpen}
+                onClose={() => setIsDownloadDialogOpen(false)}
+                applicationId={application.id}
+                applicationName={application.name}
+                envTypes={envTypes}
+                canViewDevelopment={canViewDevelopment}
+                canViewStaging={canViewStaging}
+                canViewProduction={canViewProduction}
+            />
         </AuthenticatedLayout>
     );
 };

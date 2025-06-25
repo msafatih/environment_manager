@@ -25,11 +25,6 @@ const Sidebar = ({ sidebarOpen, toggleSidebar }: SidebarProps) => {
     const { url, props } = usePage<PageProps>();
     const { auth } = props;
     const [activeSection, setActiveSection] = useState<string | null>(null);
-
-    console.log(
-        "Sidebar rendered with auth:",
-        auth.user.roles.find((role) => role.name === "super-admin")
-    );
     const can = (permission: string): boolean => {
         if (!auth.user) {
             return false;

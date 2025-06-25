@@ -3,6 +3,7 @@ export interface User {
     full_name: string;
     email: string;
     email_verified_at?: string;
+    api_token?: string;
     created_at: string;
     updated_at: string;
     group_members: GroupMember[];

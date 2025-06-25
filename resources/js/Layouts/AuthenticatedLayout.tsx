@@ -3,6 +3,7 @@
 import { type ReactNode, useState, useEffect, useRef } from "react";
 import { usePage } from "@inertiajs/react";
 import Sidebar from "@/Components/Sidebar";
+import { PageProps, User } from "@/types";
 
 interface AuthenticatedLayoutProps {
     children: React.ReactNode;
@@ -13,7 +14,8 @@ const AuthenticatedLayout = ({
     children,
     fluid = false,
 }: AuthenticatedLayoutProps) => {
-    const { props } = usePage();
+    const { auth } = usePage<PageProps>().props;
+    const { user } = auth;
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [userDropdownOpen, setUserDropdownOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
@@ -57,42 +59,52 @@ const AuthenticatedLayout = ({
         if (mainContentRef.current) {
             mainContentRef.current.scrollTop = 0;
         }
-    }, [props.url]);
+    }, [usePage().props.url]);
 
     const toggleSidebar = () => {
         setSidebarOpen(!sidebarOpen);
     };
 
     return (
-        <div className="flex h-screen overflow-hidden bg-gray-50">
-            {sidebarOpen && isMobile && (
+        <head>
+            <meta name="api-token" content={user?.api_token || ""} />
+
+            <div className="flex h-screen overflow-hidden bg-gray-50">
+                {sidebarOpen && isMobile && (
+                    <div
+                        className="fixed inset-0 z-20 bg-gray-900/50 backdrop-blur-sm transition-opacity duration-300"
+                        onClick={() => setSidebarOpen(false)}
+                    ></div>
+                )}
+
+                <Sidebar
+                    sidebarOpen={sidebarOpen}
+                    toggleSidebar={toggleSidebar}
+                />
+
                 <div
-                    className="fixed inset-0 z-20 bg-gray-900/50 backdrop-blur-sm transition-opacity duration-300"
-                    onClick={() => setSidebarOpen(false)}
-                ></div>
-            )}
-
-            <Sidebar sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
-
-            <div
-                className={`flex flex-col flex-1 transition-all duration-300 ease-in-out ${
-                    sidebarOpen ? "lg:ml-64" : ""
-                }`}
-                ref={userDropdownRef}
-            >
-                <div className="flex-1 overflow-y-auto" ref={mainContentRef}>
-                    <main className="flex-1">
-                        <div
-                            className={`p-4 sm:p-6 lg:p-8 ${
-                                fluid ? "w-full" : "max-w-7xl mx-auto"
-                            }`}
-                        >
-                            <div className="animate-fadeIn">{children}</div>
-                        </div>
-                    </main>
+                    className={`flex flex-col flex-1 transition-all duration-300 ease-in-out ${
+                        sidebarOpen ? "lg:ml-64" : ""
+                    }`}
+                    ref={userDropdownRef}
+                >
+                    <div
+                        className="flex-1 overflow-y-auto"
+                        ref={mainContentRef}
+                    >
+                        <main className="flex-1">
+                            <div
+                                className={`p-4 sm:p-6 lg:p-8 ${
+                                    fluid ? "w-full" : "max-w-7xl mx-auto"
+                                }`}
+                            >
+                                <div className="animate-fadeIn">{children}</div>
+                            </div>
+                        </main>
+                    </div>
                 </div>
             </div>
-        </div>
+        </head>
     );
 };
 
