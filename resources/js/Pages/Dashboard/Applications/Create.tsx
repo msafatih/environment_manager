@@ -9,11 +9,7 @@ import {
     AppWindow,
     Info,
     CheckCircle2,
-    Sparkles,
-    Lock,
-    Landmark,
     FolderClosed,
-    PanelRight,
 } from "lucide-react";
 import { Button } from "@/Components/ui/button";
 import {
@@ -34,8 +30,7 @@ import {
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Progress } from "@/Components/ui/progress";
+} from "@/Components/ui/tooltip";
 import {
     Select,
     SelectContent,
