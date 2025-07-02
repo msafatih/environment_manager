@@ -55,13 +55,34 @@ interface EnvValueChangesIndexProps extends PageProps {
 
 const EnvValueChangesIndex = () => {
     const {
-        envValueChanges,
+        envValueChanges: rawEnvValueChanges,
         canViewDevelopment,
         canViewStaging,
         canViewProduction,
         isSuperAdmin,
     } = usePage<EnvValueChangesIndexProps>().props;
-    console.log("EnvValueChangesIndex props:", envValueChanges);
+
+    // Ensure envValueChanges is always an array
+    const envValueChanges = useMemo(() => {
+        if (!rawEnvValueChanges) return [];
+        if (Array.isArray(rawEnvValueChanges)) return rawEnvValueChanges;
+        // If it's an object with data property (like Laravel pagination)
+        if (
+            typeof rawEnvValueChanges === "object" &&
+            "data" in rawEnvValueChanges
+        ) {
+            return Array.isArray(rawEnvValueChanges)
+                ? rawEnvValueChanges
+                : [];
+        }
+        return [];
+    }, [rawEnvValueChanges]);
+
+    console.log("EnvValueChanges data:", {
+        rawEnvValueChanges,
+        envValueChanges,
+    });
+
     const [searchTerm, setSearchTerm] = useState("");
     const [filterType, setFilterType] = useState<string | null>(null);
     const [filterEnvironment, setFilterEnvironment] = useState<string | null>(
@@ -81,9 +102,15 @@ const EnvValueChangesIndex = () => {
 
     // Get unique change types for filtering
     const changeTypes = useMemo(() => {
+        if (!Array.isArray(envValueChanges) || envValueChanges.length === 0) {
+            return [];
+        }
+
         const types = new Set<string>();
         envValueChanges.forEach((change) => {
-            types.add(change.type);
+            if (change && change.type) {
+                types.add(change.type);
+            }
         });
         return Array.from(types);
     }, [envValueChanges]);
@@ -99,7 +126,13 @@ const EnvValueChangesIndex = () => {
 
     // Client-side filtering
     const filteredChanges = useMemo(() => {
+        if (!Array.isArray(envValueChanges) || envValueChanges.length === 0) {
+            return [];
+        }
+
         return envValueChanges.filter((change) => {
+            if (!change) return false;
+
             const matchesSearch =
                 searchTerm === "" ||
                 change.env_value?.env_variable?.name
@@ -156,6 +189,10 @@ const EnvValueChangesIndex = () => {
 
     // Client-side sorting
     const sortedChanges = useMemo(() => {
+        if (!Array.isArray(filteredChanges) || filteredChanges.length === 0) {
+            return [];
+        }
+
         return [...filteredChanges].sort((a, b) => {
             if (sortField === "created_at") {
                 return sortDirection === "asc"
@@ -206,12 +243,15 @@ const EnvValueChangesIndex = () => {
 
     // Client-side pagination
     const paginatedChanges = useMemo(() => {
+        if (!Array.isArray(sortedChanges) || sortedChanges.length === 0) {
+            return [];
+        }
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
         return sortedChanges.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }, [sortedChanges, currentPage]);
 
     // Calculate total pages for pagination
-    const totalPages = Math.ceil(sortedChanges.length / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil((sortedChanges?.length || 0) / ITEMS_PER_PAGE);
 
     // Reset to first page when search term or filter changes
     useEffect(() => {
@@ -321,7 +361,7 @@ const EnvValueChangesIndex = () => {
                         </div>
                         <div className="mt-1 flex items-baseline">
                             <span className="text-2xl font-semibold text-white">
-                                {filteredChanges.length}
+                                {filteredChanges?.length || 0}
                             </span>
                         </div>
                     </div>
@@ -332,11 +372,9 @@ const EnvValueChangesIndex = () => {
                         </div>
                         <div className="mt-1 flex items-baseline">
                             <span className="text-2xl font-semibold text-white">
-                                {
-                                    filteredChanges.filter(
-                                        (c) => c.type === "create"
-                                    ).length
-                                }
+                                {filteredChanges?.filter(
+                                    (c) => c.type === "create"
+                                ).length || 0}
                             </span>
                         </div>
                     </div>
@@ -347,11 +385,9 @@ const EnvValueChangesIndex = () => {
                         </div>
                         <div className="mt-1 flex items-baseline">
                             <span className="text-2xl font-semibold text-white">
-                                {
-                                    filteredChanges.filter(
-                                        (c) => c.type === "update"
-                                    ).length
-                                }
+                                {filteredChanges?.filter(
+                                    (c) => c.type === "update"
+                                ).length || 0}
                             </span>
                         </div>
                     </div>
@@ -362,11 +398,9 @@ const EnvValueChangesIndex = () => {
                         </div>
                         <div className="mt-1 flex items-baseline">
                             <span className="text-2xl font-semibold text-white">
-                                {
-                                    filteredChanges.filter(
-                                        (c) => c.type === "delete"
-                                    ).length
-                                }
+                                {filteredChanges?.filter(
+                                    (c) => c.type === "delete"
+                                ).length || 0}
                             </span>
                         </div>
                     </div>
