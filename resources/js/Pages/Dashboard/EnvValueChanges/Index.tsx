@@ -13,7 +13,6 @@ import {
     Globe,
     Server,
     SlidersHorizontal,
-    User,
 } from "lucide-react";
 import { Badge } from "@/Components/ui/badge";
 import { Button } from "@/Components/ui/button";
@@ -47,41 +46,10 @@ import ViewChangeModal from "./Partials/ViewChangeModal";
 
 interface EnvValueChangesIndexProps extends PageProps {
     envValueChanges: EnvValueChange[];
-    canViewDevelopment: boolean;
-    canViewStaging: boolean;
-    canViewProduction: boolean;
-    isSuperAdmin: boolean;
 }
 
 const EnvValueChangesIndex = () => {
-    const {
-        envValueChanges: rawEnvValueChanges,
-        canViewDevelopment,
-        canViewStaging,
-        canViewProduction,
-        isSuperAdmin,
-    } = usePage<EnvValueChangesIndexProps>().props;
-
-    // Ensure envValueChanges is always an array
-    const envValueChanges = useMemo(() => {
-        if (!rawEnvValueChanges) return [];
-        if (Array.isArray(rawEnvValueChanges)) return rawEnvValueChanges;
-        // If it's an object with data property (like Laravel pagination)
-        if (
-            typeof rawEnvValueChanges === "object" &&
-            "data" in rawEnvValueChanges
-        ) {
-            return Array.isArray(rawEnvValueChanges)
-                ? rawEnvValueChanges
-                : [];
-        }
-        return [];
-    }, [rawEnvValueChanges]);
-
-    console.log("EnvValueChanges data:", {
-        rawEnvValueChanges,
-        envValueChanges,
-    });
+    const { envValueChanges } = usePage<EnvValueChangesIndexProps>().props;
 
     const [searchTerm, setSearchTerm] = useState("");
     const [filterType, setFilterType] = useState<string | null>(null);
@@ -115,16 +83,22 @@ const EnvValueChangesIndex = () => {
         return Array.from(types);
     }, [envValueChanges]);
 
-    // Get available environment types based on user permissions
+    // Get unique environment types from the data
     const availableEnvironments = useMemo(() => {
-        const environments = [];
-        if (canViewDevelopment) environments.push("Development");
-        if (canViewStaging) environments.push("Staging");
-        if (canViewProduction) environments.push("Production");
-        return environments;
-    }, [canViewDevelopment, canViewStaging, canViewProduction]);
+        if (!Array.isArray(envValueChanges) || envValueChanges.length === 0) {
+            return [];
+        }
 
-    // Client-side filtering
+        const environments = new Set<string>();
+        envValueChanges.forEach((change) => {
+            if (change?.env_value?.access_key?.env_type?.name) {
+                environments.add(change.env_value.access_key.env_type.name);
+            }
+        });
+        return Array.from(environments);
+    }, [envValueChanges]);
+
+    // Client-side filtering (simplified since backend already handles permissions)
     const filteredChanges = useMemo(() => {
         if (!Array.isArray(envValueChanges) || envValueChanges.length === 0) {
             return [];
@@ -153,39 +127,12 @@ const EnvValueChangesIndex = () => {
 
             const matchesEnvironment =
                 filterEnvironment === null ||
-                change.env_value?.access_key?.env_type?.name?.toLowerCase() ===
-                    filterEnvironment.toLowerCase();
+                change.env_value?.access_key?.env_type?.name ===
+                    filterEnvironment;
 
-            // Only show changes for environments the user has permission to view
-            const hasEnvironmentPermission =
-                isSuperAdmin ||
-                (change.env_value?.access_key?.env_type?.name?.toLowerCase() ===
-                    "development" &&
-                    canViewDevelopment) ||
-                (change.env_value?.access_key?.env_type?.name?.toLowerCase() ===
-                    "staging" &&
-                    canViewStaging) ||
-                (change.env_value?.access_key?.env_type?.name?.toLowerCase() ===
-                    "production" &&
-                    canViewProduction);
-
-            return (
-                matchesSearch &&
-                matchesType &&
-                matchesEnvironment &&
-                hasEnvironmentPermission
-            );
+            return matchesSearch && matchesType && matchesEnvironment;
         });
-    }, [
-        envValueChanges,
-        searchTerm,
-        filterType,
-        filterEnvironment,
-        canViewDevelopment,
-        canViewStaging,
-        canViewProduction,
-        isSuperAdmin,
-    ]);
+    }, [envValueChanges, searchTerm, filterType, filterEnvironment]);
 
     // Client-side sorting
     const sortedChanges = useMemo(() => {
@@ -271,7 +218,7 @@ const EnvValueChangesIndex = () => {
             setSortDirection(sortDirection === "asc" ? "desc" : "asc");
         } else {
             setSortField(field);
-            setSortDirection("desc"); // Default to desc when changing fields
+            setSortDirection("desc");
         }
     };
 
@@ -407,7 +354,7 @@ const EnvValueChangesIndex = () => {
                 </div>
             </div>
 
-            {/* View Change Details Modal - Now using the separate component */}
+            {/* View Change Details Modal */}
             <ViewChangeModal
                 isOpen={isViewModalOpen}
                 onClose={() => setIsViewModalOpen(false)}
@@ -809,7 +756,6 @@ const EnvValueChangesIndex = () => {
 
                 {paginatedChanges.length > 0 && (
                     <div className="border-t">
-                        {/* Use the shared ClientPagination component */}
                         <ClientPagination
                             currentPage={currentPage}
                             totalPages={totalPages}

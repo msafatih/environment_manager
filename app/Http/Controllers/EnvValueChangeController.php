@@ -14,6 +14,7 @@ use Inertia\Inertia;
 class EnvValueChangeController extends Controller
 {
     use AuthorizesRequests;
+
     /**
      * Display a listing of the resource.
      */
@@ -26,6 +27,7 @@ class EnvValueChangeController extends Controller
         $isSuperAdmin = $user->roles->contains(function ($role) {
             return strtolower($role->name) === 'super-admin';
         });
+
         $query = EnvValueChange::orderBy('created_at', 'desc')
             ->with([
                 'user',
@@ -55,15 +57,19 @@ class EnvValueChangeController extends Controller
                 $application = $change->envValue->envVariable->application;
                 $envTypeName = strtolower($change->envValue->accessKey->envType->name);
                 $appSlug = $application->slug;
+
                 if (!in_array($application->group_id, $userGroupIds)) {
                     return false;
                 }
+
                 $permissionName = 'view-' . $envTypeName . '-' . $appSlug;
                 $generalPermName = 'view-' . $envTypeName;
 
                 return $user->can($permissionName) || $user->can($generalPermName);
             });
         }
+
+        // Make application IDs visible for route generation
         $envValueChanges = $envValueChanges->map(function ($change) {
             if (
                 $change->envValue &&
@@ -75,18 +81,11 @@ class EnvValueChangeController extends Controller
             return $change;
         });
 
-        $canViewDevelopment = $isSuperAdmin || $user->can('view-development');
-        $canViewStaging = $isSuperAdmin || $user->can('view-staging');
-        $canViewProduction = $isSuperAdmin || $user->can('view-production');
+        // Convert Collection to array for consistent frontend handling
+        $envValueChangesArray = $envValueChanges->values()->toArray();
 
         return Inertia::render('Dashboard/EnvValueChanges/Index', [
-            'envValueChanges' => $envValueChanges,
-            'canShowEnvValueChanges' => $user->can('view-env-value-changes'),
-            'canViewApplications' => $user->can('view-applications'),
-            'isSuperAdmin' => $isSuperAdmin,
-            'canViewDevelopment' => $canViewDevelopment,
-            'canViewStaging' => $canViewStaging,
-            'canViewProduction' => $canViewProduction,
+            'envValueChanges' => $envValueChangesArray,
         ]);
     }
 

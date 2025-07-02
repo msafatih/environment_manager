@@ -42,7 +42,6 @@ class GroupController extends Controller
                 ->orderBy('name')
                 ->get();
         }
-
         return Inertia::render('Dashboard/Groups/Index', [
             'groups' => $groups,
             'canCreateGroup' => $user->can('create-groups'),
